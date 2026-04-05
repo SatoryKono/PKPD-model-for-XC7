@@ -1,0 +1,90 @@
+{
+  "fitted_params": {
+    "profile_type": "mono",
+    "tissue": "skin",
+    "h_base_nm": 50.0,
+    "phase1": {
+      "amplitude_nm": 150.00000000000003,
+      "t0_h": 0.0,
+      "tau_rise_h": 0.16666666666666666,
+      "tau_fall_h": 0.6666666666666665
+    },
+    "phase2": null
+  },
+  "fixed_params": {
+    "phase1.t0_h": 0.0,
+    "phase1.tau_rise_h": 0.16666666666666666,
+    "h_base_nm": 50.0
+  },
+  "bounds": {
+    "lower": [
+      10.0,
+      0.2
+    ],
+    "upper": [
+      300.0,
+      1.5
+    ]
+  },
+  "init_guess": [
+    120.0,
+    0.5
+  ],
+  "objective_definition": "marker_residuals: model(t_i)-observed(t_i)",
+  "residuals_summary": {
+    "n": 6,
+    "rmse": 1.6409281590473078e-14,
+    "mae": 9.473903143468002e-15,
+    "max_abs": 2.842170943040401e-14,
+    "sum_sq": 1.6155871338926322e-27
+  },
+  "seed": 123,
+  "scipy_version": "1.17.1",
+  "source_in_report": "IMP-01 synthetic markers",
+  "assumptions": [
+    "Scenario assumption: synthetic marker table generated from default capsaicin profile.",
+    "Scenario assumption: fixed_params were frozen during optimization due to missing explicit report parameters."
+  ],
+  "fit_meta": {
+    "success": true,
+    "status": 1,
+    "message": "`gtol` termination condition is satisfied.",
+    "nfev": 6,
+    "active_mask": [
+      0,
+      0
+    ],
+    "fitted_parameter_names": [
+      "phase1.amplitude_nm",
+      "phase1.tau_fall_h"
+    ],
+    "fixed_params": {
+      "phase1.t0_h": 0.0,
+      "phase1.tau_rise_h": 0.16666666666666666,
+      "h_base_nm": 50.0
+    },
+    "bounds": {
+      "lower": [
+        10.0,
+        0.2
+      ],
+      "upper": [
+        300.0,
+        1.5
+      ]
+    },
+    "init_guess": [
+      120.0,
+      0.5
+    ],
+    "objective_definition": "marker_residuals: model(t_i)-observed(t_i)",
+    "seed": 123,
+    "scipy_least_squares": {
+      "method": "trf",
+      "ftol": 1e-10,
+      "xtol": 1e-10,
+      "gtol": 1e-10,
+      "max_nfev": 5000
+    }
+  }
+}
