@@ -39,4 +39,4 @@ plots:
     x_unit: min
     y_unit: uM
 scenario_assumptions:
-  dermal_absorption_multiplier: 1.15
+  clip_state_explicit: false

@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from src.pipelines.run_layout import RunTables, load_run_tables
+from src.utils.atomic_io import dataframe_to_csv_atomic
 from src.plots.templates import (
     PlotAnnotationOptions,
     PlotRenderResult,
@@ -60,7 +61,7 @@ def _write_tables(tables: RunTables, output_root: Path) -> dict[str, Path]:
     written: dict[str, Path] = {}
     for name, table in mapping.items():
         path = tables_dir / f"{name}.csv"
-        table.to_csv(path, index=False)
+        dataframe_to_csv_atomic(table, path, index=False)
         written[name] = path
 
     return written
@@ -70,7 +71,7 @@ def _write_snapshot_csv(name: str, rendered: PlotRenderResult, output_root: Path
     snapshots_dir = output_root / "snapshots"
     snapshots_dir.mkdir(parents=True, exist_ok=True)
     path = snapshots_dir / f"{name}.csv"
-    rendered.data_rows.to_csv(path, index=False)
+    dataframe_to_csv_atomic(rendered.data_rows, path, index=False)
     return path
 
 

@@ -76,12 +76,22 @@ def test_repeated_deterministic_runs_keep_marker_points_hash_and_metadata_fields
             "command",
             "environment",
             "config_sha256",
+            "canonical_units",
+            "canonical_unit_tags",
+            "parameter_source",
+            "optimization_applied",
             "artifacts",
         }
         assert required.issubset(metadata.keys())
         assert metadata["deterministic_mode"] is True
 
     assert metadata_a["config_sha256"] == metadata_b["config_sha256"]
+    assert metadata_a["parameter_source"] == "defaults"
+    assert metadata_a["optimization_applied"] is False
+
+    meta_yaml_a = yaml.safe_load((out_a / "meta.yaml").read_text(encoding="utf-8"))
+    assert meta_yaml_a["parameter_source"] == "defaults"
+    assert meta_yaml_a["optimization_applied"] is False
 
     marker_record_a = next(item for item in metadata_a["artifacts"] if item["path"] == "marker_points.csv")
     marker_record_b = next(item for item in metadata_b["artifacts"] if item["path"] == "marker_points.csv")

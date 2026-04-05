@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -57,6 +58,13 @@ def fit_histamine_to_markers(
 ) -> dict[str, Any]:
     """Fit histamine profile parameters to marker points and persist full report JSON."""
 
+    warnings.warn(
+        "fit_histamine_to_markers is legacy; prefer fixed parameters (parameter_resolution=fixed_params_only "
+        "and formalin_profile / trafficking overrides in ModelConfig).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     required_cols = {"t_h", "histamine_nm"}
     if not required_cols.issubset(set(marker_df.columns)):
         raise ValueError("marker_df must contain columns: 't_h', 'histamine_nm'")
@@ -95,6 +103,7 @@ def fit_histamine_to_markers(
         x0=fit_spec.init_guess,
         bounds=fit_spec.bounds,
         method=fit_spec.method,
+        loss=scipy_least_squares_loss(fit_spec.loss_mode),
         ftol=fit_spec.ftol,
         xtol=fit_spec.xtol,
         gtol=fit_spec.gtol,
@@ -119,6 +128,7 @@ def fit_histamine_to_markers(
         },
         "init_guess": fit_spec.init_guess.tolist(),
         "objective_definition": fit_spec.objective_definition,
+        "loss_mode": fit_spec.loss_mode.value,
         "residuals_summary": {
             "n": int(final_residuals.size),
             "rmse": float(np.sqrt(np.mean(final_residuals**2))),
@@ -142,7 +152,7 @@ def fit_histamine_to_markers(
 
     output_path = Path(output_json_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_text_atomic(output_path, json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
 
 

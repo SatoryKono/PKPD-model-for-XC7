@@ -37,6 +37,60 @@ class PlotType(str, Enum):
     LOG_LINE = "log_line"
 
 
+class ParameterResolutionMode(str, Enum):
+    """How structural parameters are obtained for a run (no silent fit in default path)."""
+
+    FIXED_PARAMS_ONLY = "fixed_params_only"
+    FIT = "fit"
+
+
+class TraffickingConfig(BaseModel):
+    """H3R trafficking parameters (canonical units: nM, 1/h). Defaults match code constants."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    k_int_max: float = Field(default=2.5, gt=0)
+    k_rec: float = Field(default=0.5, gt=0)
+    k_synth: float = Field(default=0.05, ge=0)
+    ec50_barr_nm: float = Field(default=1500.0, gt=0)
+    hill_n: float = Field(default=1.0, gt=0)
+    ec50_g_nm: float = Field(default=50.0, gt=0)
+
+
+class PlotProxyConfig(BaseModel):
+    """Optional plotting proxies separate from ODE state (G_signal uses EC50 in nM)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    g_signal_ec50_nm: float | None = Field(
+        default=None,
+        description="If set, overrides trafficking.ec50_g_nm for G_signal visualization only.",
+    )
+
+    @model_validator(mode="after")
+    def _g_signal_positive_when_set(self) -> "PlotProxyConfig":
+        if self.g_signal_ec50_nm is not None and self.g_signal_ec50_nm <= 0:
+            raise ValueError("plot_proxy.g_signal_ec50_nm must be > 0 when set")
+        return self
+
+
+class FormalinPhaseOverrides(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    amplitude_nm: float | None = Field(default=None, ge=0)
+    t0_h: float | None = Field(default=None, ge=0)
+    tau_rise_h: float | None = Field(default=None, gt=0)
+    tau_fall_h: float | None = Field(default=None, gt=0)
+
+
+class FormalinProfileOverrides(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    h_base_nm: float | None = Field(default=None, ge=0)
+    phase1: FormalinPhaseOverrides | None = None
+    phase2: FormalinPhaseOverrides | None = None
+
+
 class Traceability(BaseModel):
     """Source-traceability payload for auditability in generated reports."""
 
@@ -97,6 +151,17 @@ class ModelConfig(BaseModel):
     tissues: list[TissueConfig] = Field(min_length=1)
     plots: list[PlotSpec] = Field(default_factory=list)
 
+    parameter_resolution: ParameterResolutionMode = Field(
+        default=ParameterResolutionMode.FIXED_PARAMS_ONLY,
+        description="fixed_params_only: deterministic parameters from defaults/overrides; fit is legacy-only.",
+    )
+    trafficking: TraffickingConfig | None = None
+    plot_proxy: PlotProxyConfig | None = None
+    formalin_profile: FormalinProfileOverrides | None = Field(
+        default=None,
+        description="Whitelist overrides for default_formalin_params when model uses formalin histamine profile.",
+    )
+
     scenario_assumptions: dict[str, Any] | None = Field(
         default=None,
         description=(
@@ -120,3 +185,11 @@ class ModelConfig(BaseModel):
             raise ValueError("assumptions cannot include empty strings")
 
         return self
+
+
+def effective_g_signal_ec50_nm(cfg: ModelConfig, trafficking_ec50_g_nm: float) -> float:
+    """EC50 (nM) for G_signal proxy: explicit plot_proxy wins, else trafficking EC50_G."""
+
+    if cfg.plot_proxy is not None and cfg.plot_proxy.g_signal_ec50_nm is not None:
+        return float(cfg.plot_proxy.g_signal_ec50_nm)
+    return float(trafficking_ec50_g_nm)

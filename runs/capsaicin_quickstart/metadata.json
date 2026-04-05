@@ -1,0 +1,60 @@
+{
+  "artifacts": [
+    {
+      "algorithm": "sha256",
+      "path": "simulation.csv",
+      "sha256": "8436e37aef0cbc75f0c754a76224265300f693b9fe301aec793252598867df1f",
+      "size_bytes": 498
+    },
+    {
+      "algorithm": "sha256",
+      "path": "marker_points.csv",
+      "sha256": "612caf273f8f0a29da7a55d0c7c2fbc83dfcd245100eeddcd7f1cd8d932e097d",
+      "size_bytes": 298
+    },
+    {
+      "algorithm": "sha256",
+      "path": "summary.csv",
+      "sha256": "7570613301e576a00bba1a6e8d68112f51db3fe4592007b625214d4ebbb10864",
+      "size_bytes": 216
+    },
+    {
+      "algorithm": "sha256",
+      "path": "config.used.yaml",
+      "sha256": "e1cabd6fb979bf96e55aac34a8c7d46f6c86aee084085196c6ef72512c584d3d",
+      "size_bytes": 853
+    }
+  ],
+  "canonical_unit_tags": {
+    "concentration": "nM",
+    "rate": "1/h",
+    "time": "h"
+  },
+  "canonical_units": true,
+  "command": [
+    "C:\\Users\\HP3168\\Documents\\GitHub\\PKPD-model-for-XC7\\src\\cli\\app.py",
+    "simulate",
+    "--config",
+    "examples/configs/capsaicin.yaml",
+    "--out",
+    "runs/capsaicin_quickstart"
+  ],
+  "config_sha256": "3fcb234b9d7a596d936cd0c231f1f1ed542178a1c6c80dec9038ed91d46eb75d",
+  "created_at_utc": "2026-04-05T22:04:56+00:00",
+  "deterministic_mode": true,
+  "environment": {
+    "platform": {
+      "machine": "AMD64",
+      "release": "10",
+      "system": "Windows"
+    },
+    "python": {
+      "executable": "C:\\Users\\HP3168\\Documents\\GitHub\\PKPD-model-for-XC7\\.venv\\Scripts\\python.exe",
+      "implementation": "CPython",
+      "version": "3.14.0"
+    }
+  },
+  "run_dir": "runs\\capsaicin_quickstart",
+  "run_id": "ceef89f1-612a-44a9-b780-c76a1c928332",
+  "schema_version": "1.0"
+}

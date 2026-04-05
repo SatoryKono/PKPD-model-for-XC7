@@ -7,11 +7,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.config.schemas import LossMode
 from src.fitting.fit_spec import FitSpec, ParameterSpec
 from src.fitting.histamine_fit import fit_histamine_to_markers
 from src.histamine_profiles import default_capsaicin_params, capsaicin_histamine
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_histamine_fit_is_deterministic_and_writes_report(tmp_path: Path) -> None:
     truth = default_capsaicin_params()
     t_h = np.array([0.0, 0.1, 0.3, 0.6, 1.0, 1.5])
@@ -26,6 +28,7 @@ def test_histamine_fit_is_deterministic_and_writes_report(tmp_path: Path) -> Non
         fixed_params={"phase1.t0_h": 0.0, "phase1.tau_rise_h": truth.phase1.tau_rise_h, "h_base_nm": truth.h_base_nm},
         seed=123,
         method="trf",
+        loss_mode=LossMode.MSE,
     )
 
     out_a = tmp_path / "runs" / "case_a" / "fitted_params.json"
@@ -71,6 +74,7 @@ def test_histamine_fit_is_deterministic_and_writes_report(tmp_path: Path) -> Non
     assert report_a["residuals_summary"] == report_b["residuals_summary"]
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_identifiability_guard_raises_for_incomplete_data(tmp_path: Path) -> None:
     marker_df = pd.DataFrame({"t_h": [0.0, 0.5], "histamine_nm": [50.0, 70.0]})
     spec = FitSpec(

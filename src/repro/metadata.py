@@ -66,6 +66,8 @@ def create_run_metadata(
     command: list[str] | None = None,
     canonical_units: bool = False,
     canonical_unit_tags: dict[str, str] | None = None,
+    parameter_source: str = "defaults",
+    optimization_applied: bool = False,
 ) -> dict[str, Any]:
     run_root = Path(run_dir)
     artifact_hashes = [asdict(hash_file(path)) for path in artifacts]
@@ -81,13 +83,15 @@ def create_run_metadata(
         "config_sha256": sha256(_stable_json_dumps(config_payload).encode("utf-8")).hexdigest(),
         "canonical_units": canonical_units,
         "canonical_unit_tags": canonical_unit_tags or {},
+        "parameter_source": parameter_source,
+        "optimization_applied": optimization_applied,
         "artifacts": artifact_hashes,
     }
     return metadata
 
 
 def write_metadata(metadata: dict[str, Any], path: str | Path) -> Path:
-    output = Path(path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return output
+    from src.utils.atomic_io import write_text_atomic
+
+    payload = json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    return write_text_atomic(path, payload, encoding="utf-8")

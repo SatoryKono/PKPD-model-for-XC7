@@ -1,0 +1,2 @@
+[console_scripts]
+pkpd-cli = src.cli.app:main

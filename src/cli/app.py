@@ -103,6 +103,32 @@ def validate(
     raise typer.Exit(code=1)
 
 
+@app.command()
+def fit() -> None:
+    """Reserved: optimization is not part of the supported pipeline."""
+
+    typer.secho(
+        "Подбор least_squares не входит в поддерживаемый пайплайн. "
+        "Используйте parameter_resolution: fixed_params_only (по умолчанию) и поля "
+        "trafficking / formalin_profile / plot_proxy в ModelConfig. "
+        "См. CHANGELOG.md и docs/traceability.md.",
+        err=True,
+    )
+    raise typer.Exit(code=2)
+
+
+@app.command("fit-legacy")
+def fit_legacy() -> None:
+    """Legacy hook: программный вызов ``fit_histamine_to_markers`` помечен DeprecationWarning."""
+
+    typer.secho(
+        "Используйте программный API ``src.fitting.histamine_fit.fit_histamine_to_markers`` "
+        "(DeprecationWarning). CLI-команда для фита не поддерживается. См. CHANGELOG.md.",
+        err=True,
+    )
+    raise typer.Exit(code=2)
+
+
 def main() -> None:
     """Run the Typer CLI application."""
 

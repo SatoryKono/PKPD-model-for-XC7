@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.integrate._ivp.ivp import OdeResult
 
 from src.solvers.grids import to_hours
 
@@ -31,6 +31,19 @@ class SolverConfig:
     include_markers_in_t_eval: bool = True
 
     rounding_decimals: int | None = None
+
+
+@dataclass
+class SolvedIvpResult:
+    """Public, stable view of ``solve_ivp`` outcome (avoids SciPy private types)."""
+
+    t: np.ndarray
+    y: np.ndarray
+    success: bool
+    message: str
+    sol: Any
+    marker_t: np.ndarray | None = None
+    marker_y: np.ndarray | None = None
 
 
 def _validate_t_span(t_span: tuple[float, float]) -> tuple[float, float]:
@@ -89,12 +102,12 @@ def _collect_marker_hours(config: SolverConfig) -> np.ndarray:
     return out
 
 
-def _round_result(result: OdeResult, decimals: int) -> None:
+def _round_result(result: SolvedIvpResult, decimals: int) -> None:
     result.t = np.round(result.t, decimals=decimals)
     result.y = np.round(result.y, decimals=decimals)
-    if hasattr(result, "marker_t"):
+    if result.marker_t is not None:
         result.marker_t = np.round(result.marker_t, decimals=decimals)
-    if hasattr(result, "marker_y"):
+    if result.marker_y is not None:
         result.marker_y = np.round(result.marker_y, decimals=decimals)
 
 
@@ -103,7 +116,7 @@ def solve_ivp_wrapper(
     t_span: tuple[float, float],
     y0: Sequence[float],
     config: SolverConfig,
-) -> OdeResult:
+) -> SolvedIvpResult:
     """Solve ODE using solve_ivp and optionally extract values in marker points.
 
     Marker extraction strategy:
@@ -120,7 +133,7 @@ def solve_ivp_wrapper(
         include_markers=config.include_markers_in_t_eval,
     )
 
-    result = solve_ivp(
+    raw = solve_ivp(
         fun=ode_fun,
         t_span=normalized_t_span,
         y0=np.asarray(y0, dtype=float),
@@ -132,42 +145,58 @@ def solve_ivp_wrapper(
         max_step=config.max_step,
     )
 
+    marker_t_out: np.ndarray | None = None
+    marker_y_out: np.ndarray | None = None
     if marker_times_h.size > 0:
         marker_times_h = marker_times_h[
             (marker_times_h >= normalized_t_span[0]) & (marker_times_h <= normalized_t_span[1])
         ]
         if marker_times_h.size > 0:
-            marker_values = _extract_marker_values(result, marker_times_h)
-            result.marker_t = marker_times_h
-            result.marker_y = marker_values
+            marker_y_out = _extract_marker_values(raw, marker_times_h)
+            marker_t_out = marker_times_h
+
+    out = SolvedIvpResult(
+        t=raw.t,
+        y=raw.y,
+        success=bool(raw.success),
+        message=str(raw.message),
+        sol=raw.sol,
+        marker_t=marker_t_out,
+        marker_y=marker_y_out,
+    )
 
     if config.rounding_decimals is not None:
-        _round_result(result, decimals=config.rounding_decimals)
+        _round_result(out, decimals=config.rounding_decimals)
 
-    return result
+    return out
 
 
-def _extract_marker_values(result: OdeResult, marker_times_h: Iterable[float]) -> np.ndarray:
+def _extract_marker_values(raw: Any, marker_times_h: Iterable[float]) -> np.ndarray:
     markers = np.asarray(list(marker_times_h), dtype=float)
+    y = raw.y
     if markers.size == 0:
-        return np.empty((result.y.shape[0], 0), dtype=float)
+        return np.empty((y.shape[0], 0), dtype=float)
 
-    if result.t.size > 0:
+    t = raw.t
+    if t.size > 0:
         indices = []
         has_all = True
         for m in markers:
-            i = int(np.argmin(np.abs(result.t - m)))
-            if not np.isclose(result.t[i], m, rtol=0.0, atol=1e-12):
+            i = int(np.argmin(np.abs(t - m)))
+            if not np.isclose(t[i], m, rtol=0.0, atol=1e-12):
                 has_all = False
                 break
             indices.append(i)
         if has_all:
-            return result.y[:, indices]
+            return y[:, indices]
 
-    if result.sol is None:
+    if raw.sol is None:
         raise ValueError(
             "Marker times are not present in t_eval and dense_output is disabled; "
             "cannot extract marker values exactly."
         )
 
-    return result.sol(markers)
+    return raw.sol(markers)
+
+
+__all__ = ["SolvedIvpResult", "SolverConfig", "solve_ivp_wrapper"]

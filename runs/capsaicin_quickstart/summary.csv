@@ -1,0 +1,8 @@
+metric,value
+rows,5.0
+R_surf_max,1.0
+R_int_max,0.10371814521994017
+histamine_auc_nm_h,141.45309342922133
+k_abs_per_h_used,4.8
+k_elim_per_h_used,0.8999999999999999
+tissue_partition_weighted_volume_l_used,6.82

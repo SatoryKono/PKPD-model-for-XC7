@@ -5,6 +5,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from src.config.schemas import LossMode
+
 
 @dataclass(frozen=True)
 class ParameterSpec:
@@ -28,6 +30,20 @@ class ParameterSpec:
             raise ValueError(f"Parameter '{self.name}' init must be inside bounds")
 
 
+def scipy_least_squares_loss(mode: LossMode) -> str:
+    """Map config ``LossMode`` to SciPy ``least_squares`` ``loss`` names."""
+
+    if mode == LossMode.MSE:
+        return "linear"
+    if mode == LossMode.HUBER:
+        return "huber"
+    if mode == LossMode.MAE:
+        return "soft_l1"
+    raise ValueError(
+        "LossMode.nll is not supported for scipy.optimize.least_squares; use a dedicated likelihood fitter."
+    )
+
+
 @dataclass(frozen=True)
 class FitSpec:
     """Deterministic least-squares fit configuration."""
@@ -35,6 +51,7 @@ class FitSpec:
     parameters: tuple[ParameterSpec, ...]
     fixed_params: Mapping[str, float] = field(default_factory=dict)
     objective_definition: str = "marker_residuals: model(t_i)-observed(t_i)"
+    loss_mode: LossMode = LossMode.MSE
     seed: int = 2026
     method: str = "trf"
     ftol: float = 1e-10
@@ -57,6 +74,8 @@ class FitSpec:
             raise ValueError("method must be one of {'trf', 'dogbox', 'lm'}")
         if self.method == "lm" and any((p.lower != -np.inf or p.upper != np.inf) for p in self.parameters):
             raise ValueError("method='lm' does not support finite bounds")
+        if self.loss_mode == LossMode.NLL:
+            raise ValueError("FitSpec.loss_mode='nll' is not supported for scipy least_squares legacy fit")
 
     @property
     def init_guess(self) -> np.ndarray:
@@ -97,9 +116,11 @@ def fit_spec_to_dict(spec: FitSpec) -> dict[str, Any]:
         },
         "init_guess": spec.init_guess.tolist(),
         "objective_definition": spec.objective_definition,
+        "loss_mode": spec.loss_mode.value,
         "seed": spec.seed,
         "scipy_least_squares": {
             "method": spec.method,
+            "loss": scipy_least_squares_loss(spec.loss_mode),
             "ftol": spec.ftol,
             "xtol": spec.xtol,
             "gtol": spec.gtol,

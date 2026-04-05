@@ -12,7 +12,12 @@
 |---|---|---|
 | `model_id` | В составе конфига; источник задаётся через `traceability.source_in_report` | `src/config/schemas.py` (`ModelConfig`) |
 | `compound` | То же | `src/config/schemas.py` |
-| `loss_mode` | То же | `src/config/schemas.py` (`LossMode`, `ModelConfig`) |
+| `loss_mode` | То же | `src/config/schemas.py` (`LossMode`, `ModelConfig`); наследуется в `FitSpec` для legacy `least_squares(loss=...)` |
+| `parameter_resolution` | То же | `src/config/schemas.py` (`ParameterResolutionMode`); `fixed_params_only` по умолчанию |
+| `trafficking` | То же | `src/config/schemas.py` → `src/models/receptor_trafficking.py` (`build_model_params`) |
+| `plot_proxy` | То же | `src/config/schemas.py`; EC50 для G_signal через `effective_g_signal_ec50_nm` |
+| `formalin_profile` | То же | `src/config/schemas.py` → `src/histamine_profiles.py` (`resolve_formalin_params_from_model_config`) |
+| `parameter_source` / `optimization_applied` | Пишутся в `metadata.json` / `meta.yaml` после прогона | `src/repro/metadata.py`, `src/api.py` |
 | `assumptions[]` | То же | `src/config/schemas.py` (валидация непустых строк) |
 | `time_grid`, `time_unit` | То же | `src/config/schemas.py`; используется в `src/api.py` при вызове solve_ivp |
 | `initial_concentration`, `concentration_unit` | То же | `src/config/schemas.py`; используется в `src/api.py` |

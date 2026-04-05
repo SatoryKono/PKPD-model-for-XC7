@@ -79,6 +79,39 @@ def test_build_model_params_rejects_unsupported_tissue_units() -> None:
         build_model_params(cfg)
 
 
+def test_build_model_params_uses_config_trafficking_when_set() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "unit_model",
+            "compound": "histamine",
+            "loss_mode": "mse",
+            "assumptions": ["unit_test_assumption"],
+            "traceability": {"source_in_report": "Unit test source"},
+            "time_grid": [0.0, 1.0],
+            "time_unit": "h",
+            "initial_concentration": 100.0,
+            "concentration_unit": "nM",
+            "kinetics": {"k_abs": 1.0, "k_elim": 0.2, "rate_unit": "1/h"},
+            "tissues": [
+                {"name": "plasma", "volume": 1.0, "volume_unit": "L", "partition_coeff": 1.0}
+            ],
+            "plots": [],
+            "trafficking": {
+                "k_int_max": 3.0,
+                "k_rec": 0.5,
+                "k_synth": 0.05,
+                "ec50_barr_nm": 1500.0,
+                "hill_n": 1.0,
+                "ec50_g_nm": 50.0,
+            },
+        }
+    )
+    mp = build_model_params(cfg)
+    assert mp.trafficking.k_int_max == 3.0
+    assert mp.trafficking.k_rec == 0.5
+    assert mp.trafficking.ec50_g_nm == 50.0
+
+
 def test_histamine_input_profile_responds_to_kinetics() -> None:
     cfg = ModelConfig.model_validate(
         {

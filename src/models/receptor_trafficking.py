@@ -5,7 +5,7 @@ from typing import Sequence
 
 import numpy as np
 
-from src.config.schemas import ModelConfig, RateUnit
+from src.config.schemas import ModelConfig, RateUnit, TraffickingConfig
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,19 @@ class TraffickingParams:
 
 
 DEFAULT_PARAMS = TraffickingParams()
+
+
+def _trafficking_params_from_config(cfg_block: TraffickingConfig | None) -> TraffickingParams:
+    if cfg_block is None:
+        return DEFAULT_PARAMS
+    return TraffickingParams(
+        k_int_max=float(cfg_block.k_int_max),
+        k_rec=float(cfg_block.k_rec),
+        k_synth=float(cfg_block.k_synth),
+        ec50_barr_nm=float(cfg_block.ec50_barr_nm),
+        hill_n=float(cfg_block.hill_n),
+        ec50_g_nm=float(cfg_block.ec50_g_nm),
+    )
 
 
 @dataclass(frozen=True)

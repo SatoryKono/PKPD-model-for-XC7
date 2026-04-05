@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pkpd-model-xc7"
-version = "0.1.0"
+version = "0.2.0"
 description = "Deterministic PKPD receptor-trafficking simulation toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,6 +24,7 @@ dependencies = [
 dev = [
   "build>=1.2",
   "pytest>=8.0",
+  "pytest-regtest>=0.5",
 ]
 
 [project.scripts]

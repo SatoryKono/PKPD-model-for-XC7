@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.pipelines.run_layout import RunTables
+from src.utils.atomic_io import dataframe_to_csv_atomic
 
 RoundingSpec = int | dict[str, int] | None
 
@@ -36,10 +37,7 @@ def export_delimited(
     encoding: str = "utf-8",
 ) -> Path:
     normalized = apply_rounding(frame, rounding_spec)
-    path = Path(out_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    normalized.to_csv(path, index=False, sep=sep, encoding=encoding)
-    return path
+    return dataframe_to_csv_atomic(normalized, out_path, index=False, sep=sep, encoding=encoding)
 
 
 def export_run_tables_csv_tsv(

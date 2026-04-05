@@ -1,10 +1,10 @@
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from src.validation.compare import compare_marker_tables
 from src.validation.reference_loader import find_reference_csv, load_reference_marker_table
+from src.validation.regression_harness import pipeline_marker_table_vs_reference
 from src.validation.rounding_spec import RoundingSpec
 
 
@@ -38,9 +38,7 @@ def test_marker_points_regression_against_report_reference(
 
     expected = load_reference_marker_table(model_key, base_dir=REPORT_DIR)
 
-    # In this regression scaffold, actual points are loaded from canonical marker table;
-    # replace with pipeline-produced marker_points.csv when available.
-    actual = pd.read_csv(ref_path)
+    actual = pipeline_marker_table_vs_reference(expected, model_key=model_key)
 
     diffs = compare_marker_tables(
         expected,

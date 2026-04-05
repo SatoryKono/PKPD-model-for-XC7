@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import yaml
 
 from src.config.loader import load_config as _load_config
 from src.config.loader import normalize_units
-from src.config.schemas import ModelConfig
+from src.config.schemas import ModelConfig, ParameterResolutionMode
 from src.models.receptor_trafficking import (
     build_model_params,
     histamine_input_profile,
@@ -20,6 +21,7 @@ from src.pipelines.run_layout import build_run_tables
 from src.repro.logging import close_run_logger, configure_run_logger
 from src.repro.metadata import create_run_metadata, write_metadata
 from src.solvers.solve_ivp_wrapper import SolverConfig, solve_ivp_wrapper
+from src.utils.atomic_io import dataframe_to_csv_atomic, write_text_atomic
 
 
 @dataclass(frozen=True)
@@ -52,9 +54,21 @@ def ensure_canonical_config(cfg: ModelConfig) -> ModelConfig:
     return normalize_units(cfg)
 
 
+def _infer_parameter_source(cfg: ModelConfig) -> str:
+    if cfg.formalin_profile is not None or cfg.trafficking is not None:
+        return "overrides"
+    if cfg.plot_proxy is not None and cfg.plot_proxy.g_signal_ec50_nm is not None:
+        return "overrides"
+    return "defaults"
+
+
+def _optimization_applied_from_config(cfg: ModelConfig) -> bool:
+    return cfg.parameter_resolution == ParameterResolutionMode.FIT
+
+
 def _save_used_config(config: ModelConfig, path: Path) -> None:
     payload = config.model_dump(mode="json")
-    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    write_text_atomic(path, yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
 
 def _build_summary(frame: pd.DataFrame, cfg: ModelConfig) -> pd.DataFrame:
@@ -133,9 +147,9 @@ def persist_run(result: SimulationResult, run_dir: str | Path) -> SimulationArti
     summary_csv = out_dir / "summary.csv"
 
     _save_used_config(result.config, used_config_path)
-    result.timeseries.to_csv(simulation_csv, index=False)
-    result.marker_points.to_csv(marker_points_csv, index=False)
-    result.summary.to_csv(summary_csv, index=False)
+    dataframe_to_csv_atomic(result.timeseries, simulation_csv, index=False)
+    dataframe_to_csv_atomic(result.marker_points, marker_points_csv, index=False)
+    dataframe_to_csv_atomic(result.summary, summary_csv, index=False)
 
     metadata_payload = create_run_metadata(
         run_dir=out_dir,
@@ -144,8 +158,22 @@ def persist_run(result: SimulationResult, run_dir: str | Path) -> SimulationArti
         artifacts=[simulation_csv, marker_points_csv, summary_csv, used_config_path],
         canonical_units=True,
         canonical_unit_tags={"time": "h", "concentration": "nM", "rate": "1/h"},
+        parameter_source=_infer_parameter_source(result.config),
+        optimization_applied=_optimization_applied_from_config(result.config),
     )
     metadata_json = write_metadata(metadata_payload, out_dir / "metadata.json")
+    meta_sidecar = {
+        "schema_version": metadata_payload["schema_version"],
+        "config_sha256": metadata_payload["config_sha256"],
+        "parameter_source": metadata_payload["parameter_source"],
+        "optimization_applied": metadata_payload["optimization_applied"],
+        "canonical_units": metadata_payload["canonical_units"],
+    }
+    write_text_atomic(
+        out_dir / "meta.yaml",
+        yaml.safe_dump(meta_sidecar, sort_keys=True, allow_unicode=True),
+        encoding="utf-8",
+    )
 
     return SimulationArtifacts(
         run_dir=out_dir,
@@ -234,11 +262,13 @@ def export(run_dir: str | Path, fmt: str) -> Path:
     out_path = run_path / f"simulation.{normalized_format}"
 
     if normalized_format == "csv":
-        frame.to_csv(out_path, index=False)
+        dataframe_to_csv_atomic(frame, out_path, index=False)
     elif normalized_format == "tsv":
-        frame.to_csv(out_path, index=False, sep="\t")
+        dataframe_to_csv_atomic(frame, out_path, index=False, sep="\t")
     else:
-        frame.to_excel(out_path, index=False)
+        tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+        frame.to_excel(tmp, index=False)
+        os.replace(tmp, out_path)
 
     return out_path
 
@@ -277,7 +307,13 @@ def validate(run_dir: str | Path, reference: str | Path) -> tuple[bool, str]:
         col for col in candidate.columns if pd.api.types.is_numeric_dtype(candidate[col])
     ]
     for col in numeric_cols:
-        if not (candidate[col] - baseline[col]).abs().le(1e-9).all():
+        if not np.allclose(
+            candidate[col].to_numpy(dtype=float),
+            baseline[col].to_numpy(dtype=float),
+            rtol=1e-9,
+            atol=1e-9,
+            equal_nan=True,
+        ):
             return False, f"numeric mismatch in column '{col}'"
 
     object_cols = [col for col in candidate.columns if col not in numeric_cols]

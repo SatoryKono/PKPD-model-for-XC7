@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
-from typing import Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from src.config.schemas import FormalinProfileOverrides, ModelConfig
 
 
 class ProfileType(str, Enum):
@@ -284,6 +287,72 @@ def default_acetic_writhing_params(tissue: Tissue = Tissue.PERITONEUM) -> Histam
     )
 
 
+def _merge_pulse_phase(phase: PulsePhase, overrides: Any | None) -> PulsePhase:
+    if overrides is None:
+        return phase
+    from src.config.schemas import FormalinPhaseOverrides
+
+    if not isinstance(overrides, FormalinPhaseOverrides):
+        raise TypeError("phase overrides must be FormalinPhaseOverrides")
+    return PulsePhase(
+        amplitude_nm=float(overrides.amplitude_nm)
+        if overrides.amplitude_nm is not None
+        else phase.amplitude_nm,
+        t0_h=float(overrides.t0_h) if overrides.t0_h is not None else phase.t0_h,
+        tau_rise_h=float(overrides.tau_rise_h)
+        if overrides.tau_rise_h is not None
+        else phase.tau_rise_h,
+        tau_fall_h=float(overrides.tau_fall_h)
+        if overrides.tau_fall_h is not None
+        else phase.tau_fall_h,
+    )
+
+
+def resolve_formalin_params(
+    *,
+    tissue: Tissue = Tissue.SKIN,
+    overrides: Any | None = None,
+) -> HistamineProfileParams:
+    """Defaults from ``default_formalin_params`` plus optional whitelist ``overrides`` (validated)."""
+
+    from src.config.schemas import FormalinProfileOverrides
+
+    base = default_formalin_params(tissue)
+    if overrides is None:
+        return base
+    if not isinstance(overrides, FormalinProfileOverrides):
+        raise TypeError("overrides must be FormalinProfileOverrides or None")
+
+    phase1 = _merge_pulse_phase(base.phase1, overrides.phase1)
+    phase2: PulsePhase | None
+    if base.phase2 is not None:
+        phase2 = _merge_pulse_phase(base.phase2, overrides.phase2)
+    else:
+        if overrides.phase2 is not None:
+            raise ValueError("Cannot apply phase2 overrides when base formalin profile has no phase2")
+        phase2 = None
+
+    h_base = float(overrides.h_base_nm) if overrides.h_base_nm is not None else base.h_base_nm
+
+    result = HistamineProfileParams(
+        profile_type=base.profile_type,
+        tissue=base.tissue,
+        h_base_nm=h_base,
+        phase1=phase1,
+        phase2=phase2,
+    )
+    _validate_phase(result.phase1)
+    if result.phase2 is not None:
+        _validate_phase(result.phase2)
+    return result
+
+
+def resolve_formalin_params_from_model_config(cfg: "ModelConfig", *, tissue: Tissue = Tissue.SKIN) -> HistamineProfileParams:
+    """Resolve formalin profile using optional ``cfg.formalin_profile`` overrides."""
+
+    return resolve_formalin_params(tissue=tissue, overrides=cfg.formalin_profile)
+
+
 def formalin_histamine(t: float | np.ndarray, params: HistamineProfileParams | Mapping[str, Any] | None = None) -> np.ndarray | float:
     cfg = _coerce_params(params, default_formalin_params())
     return _build_profile(cfg, t)
@@ -348,6 +417,8 @@ __all__ = [
     "PulsePhase",
     "HistamineProfileParams",
     "BASAL_HISTAMINE_NM",
+    "resolve_formalin_params",
+    "resolve_formalin_params_from_model_config",
     "formalin_histamine",
     "compound48_80_histamine",
     "capsaicin_histamine",

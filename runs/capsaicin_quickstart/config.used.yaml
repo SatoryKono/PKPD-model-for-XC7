@@ -1,0 +1,42 @@
+model_id: capsaicin_pkpd_v1
+compound: capsaicin
+loss_mode: huber
+assumptions:
+- one_compartment_absorption_model
+- first_order_elimination
+traceability:
+  source_in_report: Capsaicin pilot in-vivo study, report table 2
+  source_reference: doi:10.0000/example-capsaicin
+  source_version: 2026-01
+time_grid:
+- 0.0
+- 0.5
+- 1.0
+- 2.0
+- 4.0
+time_unit: h
+initial_concentration: 250.0
+concentration_unit: nM
+kinetics:
+  k_abs: 4.8
+  k_elim: 0.8999999999999999
+  rate_unit: 1/h
+tissues:
+- name: plasma
+  volume: 2.5
+  volume_unit: L
+  partition_coeff: 1.0
+- name: skin
+  volume: 1.2
+  volume_unit: L
+  partition_coeff: 3.6
+plots:
+- id: plasma_curve
+  title: Plasma concentration over time
+  plot_type: line
+  x: time
+  y: plasma_concentration
+  x_unit: h
+  y_unit: nM
+scenario_assumptions:
+  clip_state_explicit: false

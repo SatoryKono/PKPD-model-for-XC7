@@ -37,7 +37,11 @@ jobs:
             tests/test_cli_smoke.py \
             tests/test_export_integrity.py \
             tests/test_fitting_deterministic.py \
-            tests/test_repro_metadata.py
+            tests/test_repro_metadata.py \
+            tests/test_api_canonical_units.py \
+            tests/test_api_simulation_refactor.py \
+            tests/test_model_params_integration.py \
+            tests/test_formalin_params_resolve.py
 
       - name: Regression and snapshot tests
         run: |

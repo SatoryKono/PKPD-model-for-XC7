@@ -59,6 +59,7 @@ def test_cli_simulate_and_validate_success(tmp_path: Path) -> None:
     assert (run_dir / "marker_points.csv").exists()
     assert (run_dir / "summary.csv").exists()
     assert (run_dir / "metadata.json").exists()
+    assert (run_dir / "meta.yaml").exists()
     assert (run_dir / "config.used.yaml").exists()
 
     reference = tmp_path / "reference.csv"
@@ -126,3 +127,9 @@ def test_cli_batch_and_export_tsv(tmp_path: Path) -> None:
     )
     assert export_result.exit_code == 0, export_result.stdout
     assert (run_a / "simulation.tsv").exists()
+
+
+def test_cli_fit_command_exits_with_migration_code() -> None:
+    result = RUNNER.invoke(app, ["fit"])
+    assert result.exit_code == 2
+    assert "least_squares" in result.stderr.lower() or "пайплайн" in result.stderr
