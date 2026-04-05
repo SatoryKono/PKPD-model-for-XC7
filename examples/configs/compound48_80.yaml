@@ -1,0 +1,40 @@
+# Expected marker_points.csv (first 3 lines):
+# time_h,mast_cell_activation_nM,marker
+# 0.0,1200.0,challenge_start
+# 0.5,840.0,rapid_response
+
+model_id: compound48_80_pkpd_v2
+compound: compound48_80
+loss_mode: mse
+assumptions:
+  - instant_distribution_in_plasma
+  - receptor_driven_response_proxy
+traceability:
+  source_in_report: "Compound 48/80 challenge dataset (internal assay A17)"
+  source_reference: "lab-notebook://assay-A17"
+  source_version: "2025-12"
+time_grid: [0, 0.5, 1.0, 2.0, 4.0, 8.0]
+time_unit: h
+initial_concentration: 0.0012
+concentration_unit: mM
+kinetics:
+  k_abs: 0.6
+  k_elim: 0.11
+  rate_unit: 1/h
+tissues:
+  - name: plasma
+    volume: 2.8
+    volume_unit: L
+    partition_coeff: 1.0
+  - name: gut
+    volume: 0.9
+    volume_unit: L
+    partition_coeff: 0.8
+plots:
+  - id: activation_response
+    title: Mast-cell activation proxy
+    plot_type: log_line
+    x: time
+    y: mast_cell_activation
+    x_unit: h
+    y_unit: nM
