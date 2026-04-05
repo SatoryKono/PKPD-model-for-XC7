@@ -56,6 +56,9 @@ def test_cli_simulate_and_validate_success(tmp_path: Path) -> None:
     )
     assert simulate_result.exit_code == 0, simulate_result.stdout
     assert (run_dir / "simulation.csv").exists()
+    assert (run_dir / "marker_points.csv").exists()
+    assert (run_dir / "summary.csv").exists()
+    assert (run_dir / "metadata.json").exists()
     assert (run_dir / "config.used.yaml").exists()
 
     reference = tmp_path / "reference.csv"

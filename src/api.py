@@ -9,6 +9,9 @@ import yaml
 from src.config.loader import load_config as _load_config
 from src.config.schemas import ModelConfig
 from src.models.receptor_trafficking import receptor_trafficking_rhs, steady_state_ic
+from src.pipelines.run_layout import build_run_tables
+from src.repro.logging import close_run_logger, configure_run_logger
+from src.repro.metadata import create_run_metadata, write_metadata
 from src.solvers.solve_ivp_wrapper import SolverConfig, solve_ivp_wrapper
 
 
@@ -17,6 +20,9 @@ class SimulationArtifacts:
     run_dir: Path
     simulation_csv: Path
     used_config_yaml: Path
+    marker_points_csv: Path
+    summary_csv: Path
+    metadata_json: Path
 
 
 def load_config(path: str | Path) -> ModelConfig:
@@ -36,40 +42,68 @@ def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArt
     cfg = load_config(config) if isinstance(config, (str, Path)) else config
     run_dir = Path(out)
     run_dir.mkdir(parents=True, exist_ok=True)
+    logger = configure_run_logger(run_dir)
+    logger.info("simulation_started")
 
-    used_config_path = run_dir / "config.used.yaml"
-    _save_used_config(cfg, used_config_path)
+    try:
+        used_config_path = run_dir / "config.used.yaml"
+        _save_used_config(cfg, used_config_path)
 
-    histamine_nm = cfg.initial_concentration
-    y0 = steady_state_ic(histamine_nm)
+        histamine_nm = cfg.initial_concentration
+        y0 = steady_state_ic(histamine_nm)
 
-    result = solve_ivp_wrapper(
-        ode_fun=lambda t, y: receptor_trafficking_rhs(t, y, histamine_nm=histamine_nm),
-        t_span=(cfg.time_grid[0], cfg.time_grid[-1]),
-        y0=y0,
-        config=SolverConfig(t_eval=cfg.time_grid),
-    )
+        result = solve_ivp_wrapper(
+            ode_fun=lambda t, y: receptor_trafficking_rhs(t, y, histamine_nm=histamine_nm),
+            t_span=(cfg.time_grid[0], cfg.time_grid[-1]),
+            y0=y0,
+            config=SolverConfig(t_eval=cfg.time_grid),
+        )
 
-    if not result.success:
-        raise RuntimeError(f"Simulation failed: {result.message}")
+        if not result.success:
+            raise RuntimeError(f"Simulation failed: {result.message}")
 
-    frame = pd.DataFrame(
-        {
-            "time_h": result.t,
-            "R_surf": result.y[0],
-            "R_int": result.y[1],
-            "histamine_nm": histamine_nm,
-        }
-    )
+        frame = pd.DataFrame(
+            {
+                "time_h": result.t,
+                "R_surf": result.y[0],
+                "R_int": result.y[1],
+                "histamine_nm": histamine_nm,
+            }
+        )
 
-    simulation_csv = run_dir / "simulation.csv"
-    frame.to_csv(simulation_csv, index=False)
+        run_tables = build_run_tables(timeseries=frame)
+        simulation_csv = run_dir / "simulation.csv"
+        marker_points_csv = run_dir / "marker_points.csv"
+        summary_csv = run_dir / "summary.csv"
+        run_tables.timeseries.to_csv(simulation_csv, index=False)
+        run_tables.marker_points.to_csv(marker_points_csv, index=False)
+        run_tables.summary.to_csv(summary_csv, index=False)
 
-    return SimulationArtifacts(
-        run_dir=run_dir,
-        simulation_csv=simulation_csv,
-        used_config_yaml=used_config_path,
-    )
+        metadata_payload = create_run_metadata(
+            run_dir=run_dir,
+            deterministic_mode=True,
+            config_payload=cfg.model_dump(mode="json"),
+            artifacts=[simulation_csv, marker_points_csv, summary_csv, used_config_path],
+        )
+        metadata_json = write_metadata(metadata_payload, run_dir / "metadata.json")
+        logger.info(
+            "simulation_completed",
+            extra={"run_id": metadata_payload["run_id"]},
+        )
+
+        return SimulationArtifacts(
+            run_dir=run_dir,
+            simulation_csv=simulation_csv,
+            used_config_yaml=used_config_path,
+            marker_points_csv=marker_points_csv,
+            summary_csv=summary_csv,
+            metadata_json=metadata_json,
+        )
+    except Exception:
+        logger.exception("simulation_failed")
+        raise
+    finally:
+        close_run_logger(logger)
 
 
 def run_batch(configs_dir: str | Path, out_root: str | Path) -> list[SimulationArtifacts]:
