@@ -26,7 +26,6 @@ class SimulationResult:
 @dataclass(frozen=True)
 class SimulationArtifacts:
     run_dir: Path
-    run_id: str
     simulation_csv: Path
     used_config_yaml: Path
     marker_points_csv: Path
@@ -100,7 +99,6 @@ def persist_run(result: SimulationResult, run_dir: str | Path) -> SimulationArti
 
     return SimulationArtifacts(
         run_dir=run_path,
-        run_id=metadata_payload["run_id"],
         simulation_csv=simulation_csv,
         used_config_yaml=used_config_path,
         marker_points_csv=marker_points_csv,
@@ -123,7 +121,7 @@ def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArt
         artifacts = persist_run(result, run_dir)
         logger.info(
             "simulation_completed",
-            extra={"run_id": artifacts.run_id},
+            extra={"run_id": run_dir.name},
         )
         return artifacts
     except Exception:
