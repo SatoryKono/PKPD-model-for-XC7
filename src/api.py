@@ -3,13 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
 from src.config.loader import load_config as _load_config
 from src.config.loader import normalize_units
 from src.config.schemas import ModelConfig
-from src.models.receptor_trafficking import receptor_trafficking_rhs, steady_state_ic
+from src.models.receptor_trafficking import (
+    build_model_params,
+    histamine_input_profile,
+    receptor_trafficking_rhs,
+    steady_state_ic,
+)
 from src.pipelines.run_layout import build_run_tables
 from src.repro.logging import close_run_logger, configure_run_logger
 from src.repro.metadata import create_run_metadata, write_metadata
@@ -43,6 +49,24 @@ def _save_used_config(config: ModelConfig, path: Path) -> None:
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
+def _build_summary(frame: pd.DataFrame, cfg: ModelConfig) -> pd.DataFrame:
+    auc = float(np.trapezoid(frame["histamine_nm"].to_numpy(), frame["time_h"].to_numpy()))
+    return pd.DataFrame(
+        [
+            {"metric": "rows", "value": float(len(frame))},
+            {"metric": "R_surf_max", "value": float(frame["R_surf"].max())},
+            {"metric": "R_int_max", "value": float(frame["R_int"].max())},
+            {"metric": "histamine_auc_nm_h", "value": auc},
+            {"metric": "k_abs_per_h_used", "value": float(cfg.kinetics.k_abs)},
+            {"metric": "k_elim_per_h_used", "value": float(cfg.kinetics.k_elim)},
+            {
+                "metric": "tissue_partition_weighted_volume_l_used",
+                "value": float(sum(t.volume * t.partition_coeff for t in cfg.tissues)),
+            },
+        ]
+    )
+
+
 def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArtifacts:
     """Run a deterministic receptor-trafficking simulation and persist outputs."""
 
@@ -51,6 +75,7 @@ def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArt
         if isinstance(config, (str, Path))
         else ensure_canonical_config(config)
     )
+    model_params = build_model_params(cfg)
     run_dir = Path(out)
     run_dir.mkdir(parents=True, exist_ok=True)
     logger = configure_run_logger(run_dir)
@@ -60,11 +85,19 @@ def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArt
         used_config_path = run_dir / "config.used.yaml"
         _save_used_config(cfg, used_config_path)
 
-        histamine_nm = cfg.initial_concentration
-        y0 = steady_state_ic(histamine_nm)
+        baseline_histamine_nm = histamine_input_profile(0.0, model_params)
+        y0 = steady_state_ic(baseline_histamine_nm, params=model_params.trafficking)
+        assumptions_log = list(cfg.assumptions)
 
         result = solve_ivp_wrapper(
-            ode_fun=lambda t, y: receptor_trafficking_rhs(t, y, histamine_nm=histamine_nm),
+            ode_fun=lambda t, y: receptor_trafficking_rhs(
+                t,
+                y,
+                histamine_nm=histamine_input_profile(t, model_params),
+                params=model_params.trafficking,
+                clip_state_explicit=model_params.clip_state_explicit,
+                assumptions=assumptions_log,
+            ),
             t_span=(cfg.time_grid[0], cfg.time_grid[-1]),
             y0=y0,
             config=SolverConfig(t_eval=cfg.time_grid),
@@ -78,11 +111,14 @@ def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArt
                 "time_h": result.t,
                 "R_surf": result.y[0],
                 "R_int": result.y[1],
-                "histamine_nm": histamine_nm,
+                "histamine_nm": [histamine_input_profile(t, model_params) for t in result.t],
+                "k_abs_per_h": model_params.k_abs_per_h,
+                "k_elim_per_h": model_params.k_elim_per_h,
+                "tissue_partition_weighted_volume_l": model_params.tissues.partition_weighted_volume_l,
             }
         )
 
-        run_tables = build_run_tables(timeseries=frame)
+        run_tables = build_run_tables(timeseries=frame, summary=_build_summary(frame, cfg))
         simulation_csv = run_dir / "simulation.csv"
         marker_points_csv = run_dir / "marker_points.csv"
         summary_csv = run_dir / "summary.csv"
