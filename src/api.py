@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from src.config.loader import load_config as _load_config
+from src.config.loader import normalize_units
 from src.config.schemas import ModelConfig
 from src.models.receptor_trafficking import (
     build_model_params,
@@ -37,6 +38,12 @@ def load_config(path: str | Path) -> ModelConfig:
     return _load_config(path, normalize=True)
 
 
+def ensure_canonical_config(cfg: ModelConfig) -> ModelConfig:
+    """Return config normalized to canonical units (h, nM, 1/h)."""
+
+    return normalize_units(cfg)
+
+
 def _save_used_config(config: ModelConfig, path: Path) -> None:
     payload = config.model_dump(mode="json")
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -63,7 +70,11 @@ def _build_summary(frame: pd.DataFrame, cfg: ModelConfig) -> pd.DataFrame:
 def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArtifacts:
     """Run a deterministic receptor-trafficking simulation and persist outputs."""
 
-    cfg = load_config(config) if isinstance(config, (str, Path)) else config
+    cfg = (
+        load_config(config)
+        if isinstance(config, (str, Path))
+        else ensure_canonical_config(config)
+    )
     model_params = build_model_params(cfg)
     run_dir = Path(out)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -120,6 +131,8 @@ def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArt
             deterministic_mode=True,
             config_payload=cfg.model_dump(mode="json"),
             artifacts=[simulation_csv, marker_points_csv, summary_csv, used_config_path],
+            canonical_units=True,
+            canonical_unit_tags={"time": "h", "concentration": "nM", "rate": "1/h"},
         )
         metadata_json = write_metadata(metadata_payload, run_dir / "metadata.json")
         logger.info(

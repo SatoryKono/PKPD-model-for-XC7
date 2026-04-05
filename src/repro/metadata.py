@@ -64,6 +64,8 @@ def create_run_metadata(
     config_payload: dict[str, Any],
     artifacts: list[str | Path],
     command: list[str] | None = None,
+    canonical_units: bool = False,
+    canonical_unit_tags: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     run_root = Path(run_dir)
     artifact_hashes = [asdict(hash_file(path)) for path in artifacts]
@@ -77,6 +79,8 @@ def create_run_metadata(
         "command": command or sys.argv,
         "environment": collect_environment(),
         "config_sha256": sha256(_stable_json_dumps(config_payload).encode("utf-8")).hexdigest(),
+        "canonical_units": canonical_units,
+        "canonical_unit_tags": canonical_unit_tags or {},
         "artifacts": artifact_hashes,
     }
     return metadata
