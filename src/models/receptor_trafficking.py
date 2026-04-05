@@ -13,6 +13,7 @@ class TraffickingParams:
     k_int_max: float = 2.5
     k_rec: float = 0.50
     k_synth: float = 0.05
+    k_deg: float = 0.05
     ec50_barr_nm: float = 1500.0
     hill_n: float = 1.0
     ec50_g_nm: float = 50.0
@@ -77,7 +78,7 @@ def receptor_trafficking_rhs(
     k_int = k_int_eff(histamine_nm=histamine_nm, params=params)
 
     d_r_surf = -k_int * r_surf + params.k_rec * r_int + params.k_synth * (1.0 - r_surf - r_int)
-    d_r_int = k_int * r_surf - params.k_rec * r_int
+    d_r_int = k_int * r_surf - params.k_rec * r_int - params.k_deg * r_int
 
     return np.array([d_r_surf, d_r_int], dtype=float)
 
@@ -92,17 +93,14 @@ def steady_state_ic(
         raise ValueError("k_rec must be > 0 to compute steady-state IC")
 
     k_int = k_int_eff(histamine_nm=h_base_nm, params=params)
-    denom = k_int + params.k_rec
+    denom = params.k_deg * k_int + params.k_deg * params.k_synth + k_int * params.k_synth + params.k_rec * params.k_synth
     if denom <= 0:
-        raise ValueError("Invalid parameters: k_int + k_rec must be positive")
+        raise ValueError("Invalid parameters: denom must be positive")
 
-    r_surf0 = params.k_rec / denom
-    r_int0 = k_int / denom
+    r_surf0 = params.k_synth * (params.k_deg + params.k_rec) / denom
+    r_int0 = k_int * params.k_synth / denom
 
     if not (0.0 <= r_surf0 <= 1.0 and 0.0 <= r_int0 <= 1.0):
         raise ValueError("steady_state_ic produced values outside [0, 1]")
-
-    if abs((r_surf0 + r_int0) - 1.0) >= 1e-6:
-        raise ValueError("steady_state_ic must satisfy |(R_surf + R_int) - 1| < 1e-6")
 
     return (r_surf0, r_int0)

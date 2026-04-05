@@ -74,6 +74,14 @@ def normalize_units(config: ModelConfig) -> ModelConfig:
     )
     dumped["kinetics"]["rate_unit"] = RateUnit.PER_H
 
+    for tissue in dumped["tissues"]:
+        vol_unit = tissue["volume_unit"].lower()
+        if vol_unit == "ml":
+            tissue["volume"] /= 1000.0
+            tissue["volume_unit"] = "L"
+        elif vol_unit != "l":
+            raise ValueError(f"Unsupported volume unit: {tissue['volume_unit']}")
+
     for plot in dumped["plots"]:
         plot_x_unit = TimeUnit(plot["x_unit"])
         plot["x_unit"] = TimeUnit.H

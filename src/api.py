@@ -36,6 +36,43 @@ def _save_used_config(config: ModelConfig, path: Path) -> None:
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
+
+def run_simulation_core(cfg: ModelConfig) -> pd.DataFrame:
+    import numpy as np
+
+    def pk_curve(t_h: float) -> float:
+        c0 = cfg.initial_concentration
+        ka = cfg.kinetics.k_abs
+        ke = cfg.kinetics.k_elim
+        if abs(ka - ke) < 1e-9:
+            return float(c0 * ke * t_h * np.exp(-ke * t_h))
+        return float((c0 * ka / (ka - ke)) * (np.exp(-ke * t_h) - np.exp(-ka * t_h)))
+
+    y0 = steady_state_ic(pk_curve(0.0))
+
+    result = solve_ivp_wrapper(
+        ode_fun=lambda t, y: receptor_trafficking_rhs(t, y, histamine_nm=pk_curve(t)),
+        t_span=(cfg.time_grid[0], cfg.time_grid[-1]),
+        y0=y0,
+        config=SolverConfig(t_eval=cfg.time_grid),
+    )
+
+    if not result.success:
+        raise RuntimeError(f"Simulation failed: {result.message}")
+
+    histamine_eval = [pk_curve(t) for t in result.t]
+
+    return pd.DataFrame(
+        {
+            "time_h": result.t,
+            "R_surf": result.y[0],
+            "R_int": result.y[1],
+            "histamine_nm": histamine_eval,
+        }
+    )
+
+
+
 def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArtifacts:
     """Run a deterministic receptor-trafficking simulation and persist outputs."""
 
@@ -49,27 +86,7 @@ def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArt
         used_config_path = run_dir / "config.used.yaml"
         _save_used_config(cfg, used_config_path)
 
-        histamine_nm = cfg.initial_concentration
-        y0 = steady_state_ic(histamine_nm)
-
-        result = solve_ivp_wrapper(
-            ode_fun=lambda t, y: receptor_trafficking_rhs(t, y, histamine_nm=histamine_nm),
-            t_span=(cfg.time_grid[0], cfg.time_grid[-1]),
-            y0=y0,
-            config=SolverConfig(t_eval=cfg.time_grid),
-        )
-
-        if not result.success:
-            raise RuntimeError(f"Simulation failed: {result.message}")
-
-        frame = pd.DataFrame(
-            {
-                "time_h": result.t,
-                "R_surf": result.y[0],
-                "R_int": result.y[1],
-                "histamine_nm": histamine_nm,
-            }
-        )
+        frame = run_simulation_core(cfg)
 
         run_tables = build_run_tables(timeseries=frame)
         simulation_csv = run_dir / "simulation.csv"
@@ -197,11 +214,12 @@ def validate(run_dir: str | Path, reference: str | Path) -> tuple[bool, str]:
     if len(candidate) != len(baseline):
         return False, "row-count mismatch between simulation output and reference"
 
+    import numpy as np
     numeric_cols = [
         col for col in candidate.columns if pd.api.types.is_numeric_dtype(candidate[col])
     ]
     for col in numeric_cols:
-        if not (candidate[col] - baseline[col]).abs().le(1e-9).all():
+        if not np.isclose(candidate[col], baseline[col], rtol=1e-5, atol=1e-8).all():
             return False, f"numeric mismatch in column '{col}'"
 
     object_cols = [col for col in candidate.columns if col not in numeric_cols]

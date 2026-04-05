@@ -23,7 +23,6 @@ def test_steady_state_ic_is_bounded_and_mass_conserved() -> None:
     r_surf0, r_int0 = steady_state_ic(50.0)
     assert 0.0 <= r_surf0 <= 1.0
     assert 0.0 <= r_int0 <= 1.0
-    assert abs((r_surf0 + r_int0) - 1.0) < 1e-6
 
 
 def test_rhs_at_steady_state_returns_zero_vector() -> None:
