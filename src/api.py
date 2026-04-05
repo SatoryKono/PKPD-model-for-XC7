@@ -32,6 +32,14 @@ class SimulationArtifacts:
     metadata_json: Path
 
 
+@dataclass(frozen=True)
+class SimulationResult:
+    config: ModelConfig
+    timeseries: pd.DataFrame
+    marker_points: pd.DataFrame
+    summary: pd.DataFrame
+
+
 def load_config(path: str | Path) -> ModelConfig:
     """Load and normalize configuration from disk."""
 
@@ -67,87 +75,106 @@ def _build_summary(frame: pd.DataFrame, cfg: ModelConfig) -> pd.DataFrame:
     )
 
 
+def run_simulation(cfg: ModelConfig) -> SimulationResult:
+    """Run deterministic simulation without filesystem side effects."""
+
+    model_params = build_model_params(cfg)
+    baseline_histamine_nm = histamine_input_profile(0.0, model_params)
+    y0 = steady_state_ic(baseline_histamine_nm, params=model_params.trafficking)
+    assumptions_log = list(cfg.assumptions)
+
+    result = solve_ivp_wrapper(
+        ode_fun=lambda t, y: receptor_trafficking_rhs(
+            t,
+            y,
+            histamine_nm=histamine_input_profile(t, model_params),
+            params=model_params.trafficking,
+            clip_state_explicit=model_params.clip_state_explicit,
+            assumptions=assumptions_log,
+        ),
+        t_span=(cfg.time_grid[0], cfg.time_grid[-1]),
+        y0=y0,
+        config=SolverConfig(t_eval=cfg.time_grid),
+    )
+
+    if not result.success:
+        raise RuntimeError(f"Simulation failed: {result.message}")
+
+    frame = pd.DataFrame(
+        {
+            "time_h": result.t,
+            "R_surf": result.y[0],
+            "R_int": result.y[1],
+            "histamine_nm": [histamine_input_profile(t, model_params) for t in result.t],
+            "k_abs_per_h": model_params.k_abs_per_h,
+            "k_elim_per_h": model_params.k_elim_per_h,
+            "tissue_partition_weighted_volume_l": model_params.tissues.partition_weighted_volume_l,
+        }
+    )
+
+    run_tables = build_run_tables(timeseries=frame, summary=_build_summary(frame, cfg))
+    return SimulationResult(
+        config=cfg,
+        timeseries=run_tables.timeseries,
+        marker_points=run_tables.marker_points,
+        summary=run_tables.summary,
+    )
+
+
+def persist_run(result: SimulationResult, run_dir: str | Path) -> SimulationArtifacts:
+    """Persist simulation outputs (CSV/YAML/metadata) to the run directory."""
+
+    out_dir = Path(run_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    used_config_path = out_dir / "config.used.yaml"
+    simulation_csv = out_dir / "simulation.csv"
+    marker_points_csv = out_dir / "marker_points.csv"
+    summary_csv = out_dir / "summary.csv"
+
+    _save_used_config(result.config, used_config_path)
+    result.timeseries.to_csv(simulation_csv, index=False)
+    result.marker_points.to_csv(marker_points_csv, index=False)
+    result.summary.to_csv(summary_csv, index=False)
+
+    metadata_payload = create_run_metadata(
+        run_dir=out_dir,
+        deterministic_mode=True,
+        config_payload=result.config.model_dump(mode="json"),
+        artifacts=[simulation_csv, marker_points_csv, summary_csv, used_config_path],
+        canonical_units=True,
+        canonical_unit_tags={"time": "h", "concentration": "nM", "rate": "1/h"},
+    )
+    metadata_json = write_metadata(metadata_payload, out_dir / "metadata.json")
+
+    return SimulationArtifacts(
+        run_dir=out_dir,
+        simulation_csv=simulation_csv,
+        used_config_yaml=used_config_path,
+        marker_points_csv=marker_points_csv,
+        summary_csv=summary_csv,
+        metadata_json=metadata_json,
+    )
+
+
 def simulate(config: str | Path | ModelConfig, out: str | Path) -> SimulationArtifacts:
-    """Run a deterministic receptor-trafficking simulation and persist outputs."""
+    """Run simulation and persist outputs as orchestration thin layer."""
 
     cfg = (
         load_config(config)
         if isinstance(config, (str, Path))
         else ensure_canonical_config(config)
     )
-    model_params = build_model_params(cfg)
     run_dir = Path(out)
     run_dir.mkdir(parents=True, exist_ok=True)
     logger = configure_run_logger(run_dir)
     logger.info("simulation_started")
 
     try:
-        used_config_path = run_dir / "config.used.yaml"
-        _save_used_config(cfg, used_config_path)
-
-        baseline_histamine_nm = histamine_input_profile(0.0, model_params)
-        y0 = steady_state_ic(baseline_histamine_nm, params=model_params.trafficking)
-        assumptions_log = list(cfg.assumptions)
-
-        result = solve_ivp_wrapper(
-            ode_fun=lambda t, y: receptor_trafficking_rhs(
-                t,
-                y,
-                histamine_nm=histamine_input_profile(t, model_params),
-                params=model_params.trafficking,
-                clip_state_explicit=model_params.clip_state_explicit,
-                assumptions=assumptions_log,
-            ),
-            t_span=(cfg.time_grid[0], cfg.time_grid[-1]),
-            y0=y0,
-            config=SolverConfig(t_eval=cfg.time_grid),
-        )
-
-        if not result.success:
-            raise RuntimeError(f"Simulation failed: {result.message}")
-
-        frame = pd.DataFrame(
-            {
-                "time_h": result.t,
-                "R_surf": result.y[0],
-                "R_int": result.y[1],
-                "histamine_nm": [histamine_input_profile(t, model_params) for t in result.t],
-                "k_abs_per_h": model_params.k_abs_per_h,
-                "k_elim_per_h": model_params.k_elim_per_h,
-                "tissue_partition_weighted_volume_l": model_params.tissues.partition_weighted_volume_l,
-            }
-        )
-
-        run_tables = build_run_tables(timeseries=frame, summary=_build_summary(frame, cfg))
-        simulation_csv = run_dir / "simulation.csv"
-        marker_points_csv = run_dir / "marker_points.csv"
-        summary_csv = run_dir / "summary.csv"
-        run_tables.timeseries.to_csv(simulation_csv, index=False)
-        run_tables.marker_points.to_csv(marker_points_csv, index=False)
-        run_tables.summary.to_csv(summary_csv, index=False)
-
-        metadata_payload = create_run_metadata(
-            run_dir=run_dir,
-            deterministic_mode=True,
-            config_payload=cfg.model_dump(mode="json"),
-            artifacts=[simulation_csv, marker_points_csv, summary_csv, used_config_path],
-            canonical_units=True,
-            canonical_unit_tags={"time": "h", "concentration": "nM", "rate": "1/h"},
-        )
-        metadata_json = write_metadata(metadata_payload, run_dir / "metadata.json")
-        logger.info(
-            "simulation_completed",
-            extra={"run_id": metadata_payload["run_id"]},
-        )
-
-        return SimulationArtifacts(
-            run_dir=run_dir,
-            simulation_csv=simulation_csv,
-            used_config_yaml=used_config_path,
-            marker_points_csv=marker_points_csv,
-            summary_csv=summary_csv,
-            metadata_json=metadata_json,
-        )
+        simulation_result = run_simulation(cfg)
+        artifacts = persist_run(simulation_result, run_dir)
+        logger.info("simulation_completed")
+        return artifacts
     except Exception:
         logger.exception("simulation_failed")
         raise
