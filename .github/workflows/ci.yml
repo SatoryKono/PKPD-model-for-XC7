@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Dependency drift report
+        run: |
+          mkdir -p ci-artifacts
+          python -m pip freeze | sort > ci-artifacts/dependency-drift.txt
+
+      - name: Unit tests
+        run: |
+          pytest -q \
+            tests/test_unit_compare.py \
+            tests/test_unit_reference_loader.py \
+            tests/test_unit_rounding_spec.py \
+            tests/test_solver_marker_interpolation.py \
+            tests/test_receptor_trafficking_unit.py \
+            tests/test_cli_smoke.py \
+            tests/test_export_integrity.py \
+            tests/test_fitting_deterministic.py \
+            tests/test_repro_metadata.py
+
+      - name: Regression and snapshot tests
+        run: |
+          pytest -q \
+            tests/test_regression_marker_tables.py \
+            tests/test_snapshots_timeseries.py \
+            tests/test_plot_data_snapshots.py
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+
+      - name: Upload CI reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-reports
+          path: ci-artifacts/*
