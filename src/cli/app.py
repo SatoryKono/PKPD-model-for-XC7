@@ -103,5 +103,11 @@ def validate(
     raise typer.Exit(code=1)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run the Typer CLI application."""
+
     app()
+
+
+if __name__ == "__main__":
+    main()
