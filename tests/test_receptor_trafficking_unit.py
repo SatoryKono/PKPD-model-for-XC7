@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
+from src.config.schemas import ModelConfig
 from src.models.receptor_trafficking import (
     DEFAULT_PARAMS,
+    build_model_params,
+    histamine_input_profile,
     k_int_eff,
     receptor_trafficking_rhs,
     steady_state_ic,
@@ -44,3 +48,56 @@ def test_rhs_clipping_mode_is_explicit_and_logged() -> None:
     )
     assert dydt.shape == (2,)
     assert any("Scenario assumption" in text for text in assumptions)
+
+
+def test_build_model_params_rejects_unsupported_tissue_units() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "unit_model",
+            "compound": "histamine",
+            "loss_mode": "mse",
+            "assumptions": ["unit_test_assumption"],
+            "traceability": {"source_in_report": "Unit test source"},
+            "time_grid": [0.0, 1.0],
+            "time_unit": "h",
+            "initial_concentration": 10.0,
+            "concentration_unit": "nM",
+            "kinetics": {"k_abs": 0.4, "k_elim": 0.1, "rate_unit": "1/h"},
+            "tissues": [
+                {
+                    "name": "plasma",
+                    "volume": 1.0,
+                    "volume_unit": "mL",
+                    "partition_coeff": 1.0,
+                }
+            ],
+            "plots": [],
+        }
+    )
+
+    with pytest.raises(ValueError, match="volume_unit='L'"):
+        build_model_params(cfg)
+
+
+def test_histamine_input_profile_responds_to_kinetics() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "unit_model",
+            "compound": "histamine",
+            "loss_mode": "mse",
+            "assumptions": ["unit_test_assumption"],
+            "traceability": {"source_in_report": "Unit test source"},
+            "time_grid": [0.0, 1.0],
+            "time_unit": "h",
+            "initial_concentration": 100.0,
+            "concentration_unit": "nM",
+            "kinetics": {"k_abs": 1.0, "k_elim": 0.2, "rate_unit": "1/h"},
+            "tissues": [
+                {"name": "plasma", "volume": 1.0, "volume_unit": "L", "partition_coeff": 1.0}
+            ],
+            "plots": [],
+        }
+    )
+    params = build_model_params(cfg)
+    at_1h = histamine_input_profile(1.0, params)
+    assert at_1h > 0.0

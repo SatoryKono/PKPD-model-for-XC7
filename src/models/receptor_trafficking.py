@@ -5,6 +5,8 @@ from typing import Sequence
 
 import numpy as np
 
+from src.config.schemas import ModelConfig, RateUnit
+
 
 @dataclass(frozen=True)
 class TraffickingParams:
@@ -19,6 +21,107 @@ class TraffickingParams:
 
 
 DEFAULT_PARAMS = TraffickingParams()
+
+
+@dataclass(frozen=True)
+class TissueModelParams:
+    """Collapsed tissue parameters used by the single-compartment input profile."""
+
+    effective_volume_l: float
+    partition_weighted_volume_l: float
+
+
+@dataclass(frozen=True)
+class ModelParams:
+    """Runtime parameters that directly affect receptor RHS/input profile."""
+
+    trafficking: TraffickingParams
+    initial_concentration_nm: float
+    k_abs_per_h: float
+    k_elim_per_h: float
+    tissues: TissueModelParams
+    clip_state_explicit: bool
+
+
+def build_model_params(cfg: ModelConfig) -> ModelParams:
+    """Build validated model parameters from ``ModelConfig``.
+
+    Contract (fields that affect RHS/input profile):
+    - ``initial_concentration``: concentration-scale for histamine input profile.
+    - ``kinetics.k_abs`` and ``kinetics.k_elim``: first-order absorption/elimination in 1/h.
+    - ``tissues[*].volume`` and ``tissues[*].partition_coeff``: collapsed into effective
+      distribution volume for the concentration profile.
+    - ``scenario_assumptions.clip_state_explicit`` (optional bool): explicit RHS clipping mode.
+
+    Unsupported scenario-assumption keys raise ``ValueError`` to avoid silent ignores.
+    """
+
+    if cfg.kinetics.rate_unit != RateUnit.PER_H:
+        raise ValueError(
+            "Model requires kinetics.rate_unit='1/h'. "
+            "Use normalized config (load_config(..., normalize=True))."
+        )
+
+    if any(tissue.volume_unit.strip().lower() != "l" for tissue in cfg.tissues):
+        raise ValueError(
+            "Only tissue.volume_unit='L' is supported by the current input-profile model."
+        )
+
+    effective_volume_l = float(sum(tissue.volume for tissue in cfg.tissues))
+    partition_weighted_volume_l = float(
+        sum(tissue.volume * tissue.partition_coeff for tissue in cfg.tissues)
+    )
+    if effective_volume_l <= 0 or partition_weighted_volume_l <= 0:
+        raise ValueError("Tissue-derived volumes must be > 0 for model execution.")
+
+    scenario_assumptions = cfg.scenario_assumptions or {}
+    supported_scenario_keys = {"clip_state_explicit"}
+    unsupported = sorted(set(scenario_assumptions) - supported_scenario_keys)
+    if unsupported:
+        raise ValueError(
+            "Unsupported scenario_assumptions for receptor model: "
+            f"{unsupported}. Supported keys: {sorted(supported_scenario_keys)}"
+        )
+
+    clip_state_explicit_raw = scenario_assumptions.get("clip_state_explicit", False)
+    if not isinstance(clip_state_explicit_raw, bool):
+        raise ValueError("scenario_assumptions.clip_state_explicit must be a boolean.")
+
+    return ModelParams(
+        trafficking=DEFAULT_PARAMS,
+        initial_concentration_nm=float(cfg.initial_concentration),
+        k_abs_per_h=float(cfg.kinetics.k_abs),
+        k_elim_per_h=float(cfg.kinetics.k_elim),
+        tissues=TissueModelParams(
+            effective_volume_l=effective_volume_l,
+            partition_weighted_volume_l=partition_weighted_volume_l,
+        ),
+        clip_state_explicit=clip_state_explicit_raw,
+    )
+
+
+def histamine_input_profile(t_h: float, params: ModelParams) -> float:
+    """Oral one-compartment concentration profile used as receptor driver."""
+
+    if t_h < 0:
+        raise ValueError("t_h must be >= 0")
+
+    dose_nmol = params.initial_concentration_nm * params.tissues.effective_volume_l
+    distribution_volume_l = params.tissues.partition_weighted_volume_l
+    scale = dose_nmol / distribution_volume_l
+
+    delta = params.k_abs_per_h - params.k_elim_per_h
+    if abs(delta) < 1e-12:
+        # Stable limit of Bateman function for k_abs -> k_elim.
+        concentration_nm = scale * params.k_abs_per_h * t_h * np.exp(-params.k_elim_per_h * t_h)
+    else:
+        concentration_nm = (
+            scale
+            * (params.k_abs_per_h / delta)
+            * (np.exp(-params.k_elim_per_h * t_h) - np.exp(-params.k_abs_per_h * t_h))
+        )
+
+    return float(max(concentration_nm, 0.0))
 
 
 def _register_assumption(assumptions: list[str] | None, message: str) -> None:
