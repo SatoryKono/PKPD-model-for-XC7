@@ -1,0 +1,2 @@
+[console_scripts]
+pkpd-cli = pkpd_xc7.cli.app:main

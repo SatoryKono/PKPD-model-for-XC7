@@ -1,0 +1,17 @@
+model_id: phase1_pk_smoke
+compound: test
+loss_mode: mse
+traceability:
+  source_in_report: "Fixture: phase1 pk"
+  source_reference: ""
+assumptions:
+  - "phase1_stub_assumption"
+driver:
+  driver_type: pk
+  k_abs_per_h: 0.1
+  k_elim_per_h: 0.05
+tissues:
+  - skin
+time_grid_h:
+  - 0.0
+  - 1.0

@@ -1,81 +1,65 @@
 from __future__ import annotations
 
-import json
+import yaml
 from pathlib import Path
 
-import openpyxl
 import pandas as pd
-import yaml
 
-from src.exporters.csv_tsv import export_delimited
-from src.exporters.json_yaml import export_json, export_yaml
-from src.exporters.xlsx import export_xlsx
-from src.pipelines.run_layout import build_run_tables
+from pkpd_xc7.config.schemas import ModelConfig
+from pkpd_xc7.io import build_simulation_meta, export_simulation_run, load_simulation_run
+from pkpd_xc7.io.layout import TIMESERIES_COLUMN_ORDER
+from pkpd_xc7.simulation.runner import run_experiment
 
 
-def _sample_timeseries() -> pd.DataFrame:
-    return pd.DataFrame(
+def _sample_config() -> ModelConfig:
+    return ModelConfig.model_validate(
         {
-            "time_h": [0.0, 0.5, 1.0],
-            "R_surf": [10.123456, 9.987654, 9.543219],
-            "R_int": [1.234567, 1.876543, 2.111119],
-            "histamine_nm": [100.0, 100.0, 100.0],
-            "extra_tail": ["a", "b", "c"],
+            "model_id": "export_integrity",
+            "compound": "xc7",
+            "loss_mode": "mse",
+            "traceability": {"source_in_report": "export integrity"},
+            "assumptions": ["export integrity test"],
+            "driver": {"driver_type": "scenario", "scenario_id": "formalin"},
+            "tissues": ["skin", "spinal_coord"],
+            "time_grid_h": [0.0, 0.25, 1.0],
         }
     )
 
 
-def test_csv_tsv_utf8_separator_and_rounding(tmp_path: Path) -> None:
-    table = _sample_timeseries()
+def test_export_simulation_run_writes_canonical_csv_and_yaml(tmp_path: Path) -> None:
+    config = _sample_config()
+    df = run_experiment(config)
 
-    csv_path = export_delimited(
-        table,
-        tmp_path / "timeseries.csv",
-        sep=",",
-        rounding_spec={"R_surf": 2, "R_int": 3},
-        encoding="utf-8",
-    )
-    tsv_path = export_delimited(
-        table,
-        tmp_path / "timeseries.tsv",
-        sep="\t",
-        rounding_spec=2,
-        encoding="utf-8",
-    )
+    artifacts = export_simulation_run(df, config, tmp_path / "run")
+    simulation = pd.read_csv(artifacts.simulation_csv)
+    meta = yaml.safe_load(artifacts.meta_yaml.read_text(encoding="utf-8"))
 
-    csv_df = pd.read_csv(csv_path)
-    tsv_df = pd.read_csv(tsv_path, sep="\t")
-
-    assert csv_df.loc[0, "R_surf"] == 10.12
-    assert csv_df.loc[0, "R_int"] == 1.235
-    assert tsv_df.loc[1, "R_surf"] == 9.99
-    assert tsv_df.loc[1, "R_int"] == 1.88
+    assert simulation.columns.tolist() == TIMESERIES_COLUMN_ORDER
+    assert meta["column_order"] == TIMESERIES_COLUMN_ORDER
+    assert meta["row_count"] == len(simulation.index)
+    assert meta["driver_type"] == "scenario"
+    assert meta["driver_id"] == "formalin"
 
 
-def test_json_yaml_and_xlsx_layout(tmp_path: Path) -> None:
-    tables = build_run_tables(_sample_timeseries())
+def test_build_simulation_meta_includes_resolved_trafficking_and_runtime_assumptions() -> None:
+    config = _sample_config()
+    df = run_experiment(config)
 
-    json_path = export_json(tables, tmp_path / "run.json", rounding_spec={"R_surf": 2})
-    yaml_path = export_yaml(tables, tmp_path / "run.yaml", rounding_spec={"R_surf": 2})
-    xlsx_path = export_xlsx(tables, tmp_path / "run.xlsx", rounding_spec={"R_surf": 2})
+    meta = build_simulation_meta(df, config)
 
-    json_payload = json.loads(json_path.read_text(encoding="utf-8"))
-    yaml_payload = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-
-    assert list(json_payload.keys()) == ["timeseries", "marker_points", "summary"]
-    assert list(yaml_payload.keys()) == ["timeseries", "marker_points", "summary"]
-
-    workbook = openpyxl.load_workbook(xlsx_path)
-    assert workbook.sheetnames == ["timeseries", "marker_points", "summary"]
-    assert workbook["timeseries"].freeze_panes == "A2"
-    assert workbook["marker_points"].freeze_panes == "A2"
-    assert workbook["summary"].freeze_panes == "A2"
+    assert meta["default_trafficking_params"]["ec50_g_nm"] == config.trafficking.ec50_g_nm
+    assert set(meta["trafficking_params_by_tissue"]) == {"skin", "spinal_coord"}
+    assert "runtime_assumptions" in meta
+    assert meta["simulation_schema_version"]
 
 
-def test_run_layout_keeps_required_columns_prefix() -> None:
-    raw = _sample_timeseries()
-    tables = build_run_tables(raw)
+def test_load_simulation_run_roundtrips_exported_timeseries(tmp_path: Path) -> None:
+    config = _sample_config()
+    df = run_experiment(config)
+    export_simulation_run(df, config, tmp_path / "run")
 
-    assert list(tables.timeseries.columns[:4]) == ["time_h", "R_surf", "R_int", "histamine_nm"]
-    assert list(tables.marker_points.columns[:4]) == ["time_h", "R_surf", "R_int", "histamine_nm"]
-    assert list(tables.summary.columns)[:2] == ["metric", "value"]
+    run = load_simulation_run(tmp_path / "run")
+    raw_csv = pd.read_csv(tmp_path / "run" / "simulation.csv")
+
+    assert run.timeseries.equals(raw_csv)
+    assert run.meta["driver_id"] == "formalin"

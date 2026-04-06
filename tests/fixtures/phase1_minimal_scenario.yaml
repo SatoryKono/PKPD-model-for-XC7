@@ -1,0 +1,17 @@
+model_id: phase1_scenario_smoke
+compound: test
+loss_mode: mse
+traceability:
+  source_in_report: "Fixture: phase1 scenario"
+  source_reference: ""
+assumptions:
+  - "phase1_stub_assumption"
+driver:
+  driver_type: scenario
+  scenario_id: formalin
+tissues:
+  - skin
+time_grid_h:
+  - 0.0
+  - 1.0
+  - 2.0

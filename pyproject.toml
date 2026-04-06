@@ -28,14 +28,14 @@ dev = [
 ]
 
 [project.scripts]
-pkpd-cli = "src.cli.app:main"
+pkpd-cli = "pkpd_xc7.cli.app:main"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
+include = ["pkpd_xc7*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

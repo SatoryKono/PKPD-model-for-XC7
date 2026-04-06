@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-import pandas as pd
-import yaml
 from pandas.testing import assert_frame_equal
 
-from src import api
-from src.config.schemas import ModelConfig
+from pkpd_xc7.config.schemas import ModelConfig
+from pkpd_xc7.simulation.runner import run_experiment
 
 
 def _noncanonical_payload() -> dict:
     return {
         "model_id": "canonical_test_model",
-        "compound": "histamine",
+        "compound": "xc7",
         "loss_mode": "mse",
         "assumptions": ["unit_equivalence"],
         "traceability": {
@@ -24,22 +19,9 @@ def _noncanonical_payload() -> dict:
         },
         "time_grid": [0.0, 30.0, 60.0, 90.0, 120.0],
         "time_unit": "min",
-        "initial_concentration": 0.1,
-        "concentration_unit": "uM",
-        "kinetics": {
-            "k_abs": 0.02,
-            "k_elim": 0.005,
-            "rate_unit": "1/min",
-        },
-        "tissues": [
-            {
-                "name": "plasma",
-                "volume": 1.0,
-                "volume_unit": "L",
-                "partition_coeff": 1.0,
-            }
-        ],
-        "plots": [],
+        "driver": {"driver_type": "pk", "dose": 100.0, "k_abs_per_h": 1.2, "k_elim_per_h": 0.3},
+        "trafficking": {"h_base_nm": 50.0},
+        "tissues": ["brain"],
     }
 
 
@@ -47,7 +29,7 @@ def _canonical_config() -> ModelConfig:
     return ModelConfig.model_validate(
         {
             "model_id": "canonical_test_model",
-            "compound": "histamine",
+            "compound": "xc7",
             "loss_mode": "mse",
             "assumptions": ["unit_equivalence"],
             "traceability": {
@@ -55,46 +37,26 @@ def _canonical_config() -> ModelConfig:
                 "source_reference": "tests",
                 "source_version": "1",
             },
-            "time_grid": [0.0, 0.5, 1.0, 1.5, 2.0],
-            "time_unit": "h",
-            "initial_concentration": 100.0,
-            "concentration_unit": "nM",
-            "kinetics": {
-                "k_abs": 1.2,
-                "k_elim": 0.3,
-                "rate_unit": "1/h",
-            },
-            "tissues": [
-                {
-                    "name": "plasma",
-                    "volume": 1.0,
-                    "volume_unit": "L",
-                    "partition_coeff": 1.0,
-                }
-            ],
-            "plots": [],
+            "driver": {"driver_type": "pk", "dose": 100.0, "k_abs_per_h": 1.2, "k_elim_per_h": 0.3},
+            "trafficking": {"h_base_nm": 50.0},
+            "tissues": ["brain"],
+            "time_grid_h": [0.0, 0.5, 1.0, 1.5, 2.0],
         }
     )
 
 
-def test_simulate_path_and_model_config_are_equivalent_across_units(tmp_path: Path) -> None:
-    config_path = tmp_path / "noncanonical.yaml"
-    config_path.write_text(yaml.safe_dump(_noncanonical_payload(), sort_keys=False), encoding="utf-8")
+def test_model_config_normalizes_time_units_to_time_grid_h() -> None:
+    normalized = ModelConfig.model_validate(_noncanonical_payload())
+    canonical = _canonical_config()
 
-    out_from_path = tmp_path / "run_from_path"
-    out_from_model = tmp_path / "run_from_model"
+    assert normalized.time_grid_h == canonical.time_grid_h
 
-    api.simulate(config_path, out_from_path)
-    api.simulate(_canonical_config(), out_from_model)
 
-    simulation_from_path = pd.read_csv(out_from_path / "simulation.csv")
-    simulation_from_model = pd.read_csv(out_from_model / "simulation.csv")
-    assert_frame_equal(simulation_from_path, simulation_from_model)
+def test_run_experiment_is_equivalent_for_min_and_hour_inputs() -> None:
+    normalized = ModelConfig.model_validate(_noncanonical_payload())
+    canonical = _canonical_config()
 
-    metadata = json.loads((out_from_model / "metadata.json").read_text(encoding="utf-8"))
-    assert metadata["canonical_units"] is True
-    assert metadata["canonical_unit_tags"] == {
-        "time": "h",
-        "concentration": "nM",
-        "rate": "1/h",
-    }
+    simulation_from_min = run_experiment(normalized)
+    simulation_from_hours = run_experiment(canonical)
+
+    assert_frame_equal(simulation_from_min, simulation_from_hours)

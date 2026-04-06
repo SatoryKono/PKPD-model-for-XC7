@@ -1,4 +1,0 @@
-{"timestamp_utc": "2026-04-05T22:01:47.039900+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_started"}
-{"timestamp_utc": "2026-04-05T22:01:47.046533+00:00", "level": "ERROR", "logger": "pkpd.run", "message": "simulation_failed"}
-{"timestamp_utc": "2026-04-05T22:04:55.993268+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_started"}
-{"timestamp_utc": "2026-04-05T22:04:56.101772+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_completed"}

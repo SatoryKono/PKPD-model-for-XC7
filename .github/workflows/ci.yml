@@ -26,29 +26,9 @@ jobs:
           mkdir -p ci-artifacts
           python -m pip freeze | sort > ci-artifacts/dependency-drift.txt
 
-      - name: Unit tests
+      - name: Run tests (unit, regression, snapshots)
         run: |
-          pytest -q \
-            tests/test_unit_compare.py \
-            tests/test_unit_reference_loader.py \
-            tests/test_unit_rounding_spec.py \
-            tests/test_solver_marker_interpolation.py \
-            tests/test_receptor_trafficking_unit.py \
-            tests/test_cli_smoke.py \
-            tests/test_export_integrity.py \
-            tests/test_fitting_deterministic.py \
-            tests/test_repro_metadata.py \
-            tests/test_api_canonical_units.py \
-            tests/test_api_simulation_refactor.py \
-            tests/test_model_params_integration.py \
-            tests/test_formalin_params_resolve.py
-
-      - name: Regression and snapshot tests
-        run: |
-          pytest -q \
-            tests/test_regression_marker_tables.py \
-            tests/test_snapshots_timeseries.py \
-            tests/test_plot_data_snapshots.py
+          pytest tests/ -q
 
       - name: Build wheel and sdist
         run: python -m build

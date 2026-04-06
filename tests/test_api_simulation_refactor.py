@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-import json
+import yaml
 from pathlib import Path
 
-from src import api
-from src.config.schemas import ModelConfig
+import pandas as pd
+from pandas.testing import assert_frame_equal
+import pytest
+
+from pkpd_xc7.config.schemas import ModelConfig
+from pkpd_xc7.io import export_simulation_run, load_simulation_run
+from pkpd_xc7.io.layout import TIMESERIES_COLUMN_ORDER
+from pkpd_xc7.simulation.runner import run_experiment
 
 
 def _canonical_config() -> ModelConfig:
     return ModelConfig.model_validate(
         {
             "model_id": "refactor_test_model",
-            "compound": "histamine",
+            "compound": "xc7",
             "loss_mode": "mse",
             "assumptions": ["refactor_test_assumption"],
             "traceability": {
@@ -19,64 +25,46 @@ def _canonical_config() -> ModelConfig:
                 "source_reference": "tests",
                 "source_version": "1",
             },
-            "time_grid": [0.0, 0.5, 1.0, 1.5, 2.0],
-            "time_unit": "h",
-            "initial_concentration": 100.0,
-            "concentration_unit": "nM",
-            "kinetics": {
-                "k_abs": 1.2,
-                "k_elim": 0.3,
-                "rate_unit": "1/h",
-            },
-            "tissues": [
-                {
-                    "name": "plasma",
-                    "volume": 1.0,
-                    "volume_unit": "L",
-                    "partition_coeff": 1.0,
-                }
-            ],
-            "plots": [],
+            "driver": {"driver_type": "pk", "dose": 100.0, "k_abs_per_h": 1.2, "k_elim_per_h": 0.3},
+            "trafficking": {"h_base_nm": 50.0},
+            "tissue_overrides": {"brain": {"trafficking": {"h_base_nm": 2.0}}},
+            "tissues": ["brain"],
+            "time_grid_h": [0.0, 0.5, 1.0, 1.5, 2.0],
         }
     )
 
 
-def test_run_simulation_is_pure_and_deterministic_without_filesystem() -> None:
+def test_run_experiment_is_pure_and_deterministic_without_filesystem() -> None:
     cfg = _canonical_config()
 
-    first = api.run_simulation(cfg)
-    second = api.run_simulation(cfg)
+    first = run_experiment(cfg)
+    second = run_experiment(cfg)
 
-    assert first.config == cfg
-    assert list(first.timeseries.columns) == [
-        "time_h",
-        "R_surf",
-        "R_int",
-        "histamine_nm",
-        "k_abs_per_h",
-        "k_elim_per_h",
-        "tissue_partition_weighted_volume_l",
-    ]
-    assert len(first.timeseries) == len(cfg.time_grid)
-    assert first.timeseries.equals(second.timeseries)
-    assert first.marker_points.equals(second.marker_points)
-    assert first.summary.equals(second.summary)
+    assert list(first.columns) == TIMESERIES_COLUMN_ORDER
+    assert len(first) == len(cfg.time_grid_h)
+    assert first.equals(second)
+    assert first.attrs["solver_metadata"] == second.attrs["solver_metadata"]
+    assert first.attrs["runtime_assumptions"] == second.attrs["runtime_assumptions"]
 
 
-def test_persist_run_writes_csv_yaml_and_metadata(tmp_path: Path) -> None:
-    result = api.run_simulation(_canonical_config())
+def test_export_simulation_run_writes_csv_and_meta_yaml(tmp_path: Path) -> None:
+    result = run_experiment(_canonical_config())
 
-    artifacts = api.persist_run(result, tmp_path / "run")
+    artifacts = export_simulation_run(result, _canonical_config(), tmp_path / "run")
 
-    assert artifacts.run_dir.exists()
+    assert artifacts.out_dir.exists()
     assert artifacts.simulation_csv.exists()
-    assert artifacts.marker_points_csv.exists()
-    assert artifacts.summary_csv.exists()
-    assert artifacts.used_config_yaml.exists()
-    assert artifacts.metadata_json.exists()
+    assert artifacts.meta_yaml.exists()
 
-    metadata = json.loads(artifacts.metadata_json.read_text(encoding="utf-8"))
-    recorded_paths = {item["path"] for item in metadata["artifacts"]}
-    assert {"simulation.csv", "marker_points.csv", "summary.csv", "config.used.yaml"}.issubset(
-        recorded_paths
-    )
+    simulation = pd.read_csv(artifacts.simulation_csv)
+    run = load_simulation_run(tmp_path / "run")
+    meta = yaml.safe_load(artifacts.meta_yaml.read_text(encoding="utf-8"))
+
+    assert simulation.columns.tolist()[0] == "time_h"
+    assert_frame_equal(run.timeseries, simulation, check_dtype=False)
+    assert meta["driver_type"] == "pk"
+    assert meta["driver_id"] == "pk_model"
+    assert meta["row_count"] == len(simulation)
+    assert meta["trafficking_params_by_tissue"]["brain"]["h_base_nm"] == pytest.approx(2.0)
+    assert "refactor_test_assumption" in meta["runtime_assumptions"]
+    assert all("legacy h_base_nm=50.0" not in item for item in meta["runtime_assumptions"])
