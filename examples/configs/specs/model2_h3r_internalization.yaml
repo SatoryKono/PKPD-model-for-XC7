@@ -1,0 +1,37 @@
+schema_version: "0.1.0"
+config_kind: literature_model_spec
+implementation_status: specification_only
+model:
+  id: model_2_h3r_internalization
+  name: h3r_internalization
+  description: Surface/internalized H3R dynamics driven by histamine concentration.
+  input_dependencies:
+    - model_1_histamine_dynamics
+  output_state_order:
+    - r_surf
+    - r_int
+units:
+  rate: 1/h
+  concentration: nM
+  hill_coefficient: unitless
+equations:
+  d_r_surf_dt: -k_int_eff(H) * R_surf + k_rec * R_int + k_synth * (1 - R_surf - R_int)
+  d_r_int_dt: k_int_eff(H) * R_surf - k_rec * R_int
+  k_int_eff: k_int_max * (H^n / (EC50_barr^n + H^n))
+parameters:
+  k_int_max_per_h: 2.5
+  k_rec_per_h: 0.50
+  k_synth_per_h: 0.05
+  ec50_barr_nm: 1500.0
+  hill_n: 1.0
+state_constraints:
+  r_surf_min: 0.0
+  r_surf_max: 1.0
+  r_int_min: 0.0
+  r_int_max: 1.0
+  conservation_target: 1.0
+initial_conditions:
+  strategy: steady_state_at_baseline_histamine
+traceability:
+  source_type: user_extracted_literature_notes
+  source_section_mapping_status: pending

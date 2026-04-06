@@ -8,6 +8,9 @@ import pandas as pd
 from src import api
 from src.config.schemas import (
     ConcentrationUnit,
+    HistamineProfileConfig,
+    HistamineProfileId,
+    HistamineTissue,
     KineticsConfig,
     LossMode,
     ModelConfig,
@@ -18,15 +21,25 @@ from src.config.schemas import (
     TimeUnit,
     effective_g_signal_ec50_nm,
 )
+from src.histamine_profiles import Tissue
+from src.models.g_signaling import default_g_signal_params_for_tissue, g_signal_percent
 from src.models.receptor_trafficking import TraffickingParams, build_model_params
 
 
-def g_signal_proxy(r_surf: np.ndarray, histamine_nm: np.ndarray, ec50_nm: float) -> np.ndarray:
-    """G column consistent with plot proxy: R_surf * H / (EC50 + H)."""
-    h = np.asarray(histamine_nm, dtype=float)
-    rs = np.asarray(r_surf, dtype=float)
-    den = float(ec50_nm) + h
-    return (rs * h) / den
+def g_signal_proxy(
+    r_surf: np.ndarray,
+    histamine_nm: np.ndarray,
+    *,
+    ec50_nm: float,
+    hill_n: float = 1.0,
+) -> np.ndarray:
+    """G column consistent with Model 3 G-signaling equation."""
+    params = default_g_signal_params_for_tissue(
+        Tissue.SKIN,
+        ec50_g_nm=ec50_nm,
+        hill_n=hill_n,
+    )
+    return np.asarray(g_signal_percent(histamine_nm, r_surf, params), dtype=float)
 
 
 def loss_metric(r_surf: np.ndarray, r_int: np.ndarray) -> np.ndarray:
@@ -55,6 +68,19 @@ def regression_model_config(
             ec50_g_nm=trafficking.ec50_g_nm,
         )
 
+    histamine_profile: HistamineProfileConfig | None = None
+    initial_concentration: float | None = 100.0
+    concentration_unit: ConcentrationUnit | None = ConcentrationUnit.NM
+    kinetics: KineticsConfig | None = KineticsConfig(k_abs=1.2, k_elim=0.3, rate_unit=RateUnit.PER_H)
+    if model_key == "formalin":
+        histamine_profile = HistamineProfileConfig(
+            profile_id=HistamineProfileId.FORMALIN,
+            tissue=HistamineTissue.SKIN,
+        )
+        initial_concentration = None
+        concentration_unit = None
+        kinetics = None
+
     return ModelConfig(
         model_id=model_key,
         compound="histamine",
@@ -68,13 +94,14 @@ def regression_model_config(
         ),
         time_grid=time_grid,
         time_unit=TimeUnit.H,
-        initial_concentration=100.0,
-        concentration_unit=ConcentrationUnit.NM,
-        kinetics=KineticsConfig(k_abs=1.2, k_elim=0.3, rate_unit=RateUnit.PER_H),
+        initial_concentration=initial_concentration,
+        concentration_unit=concentration_unit,
+        kinetics=kinetics,
         tissues=[
             TissueConfig(name="plasma", volume=1.0, volume_unit="L", partition_coeff=1.0),
         ],
         plots=[],
+        histamine_profile=histamine_profile,
         trafficking=t_cfg,
     )
 
@@ -108,7 +135,12 @@ def marker_table_from_simulation_result(
         elif col == "R_int":
             out["R_int"] = ri
         elif col == "G":
-            out["G"] = g_signal_proxy(rs, h, ec50_g_nm)
+            out["G"] = g_signal_proxy(
+                rs,
+                h,
+                ec50_nm=ec50_eff,
+                hill_n=tp.hill_n,
+            )
         elif col == "loss":
             out["loss"] = loss_metric(rs, ri)
         else:

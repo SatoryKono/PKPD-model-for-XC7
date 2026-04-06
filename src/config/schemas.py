@@ -44,6 +44,24 @@ class ParameterResolutionMode(str, Enum):
     FIT = "fit"
 
 
+class HistamineProfileId(str, Enum):
+    PK_BATEMAN = "pk_bateman"
+    FORMALIN = "formalin"
+    COMPOUND48_80 = "compound48_80"
+    CAPSAICIN = "capsaicin"
+    CARRAGEENIN = "carrageenin"
+    HOTPLATE = "hotplate"
+    ACETIC_WRITHING = "acetic_writhing"
+
+
+class HistamineTissue(str, Enum):
+    SKIN = "skin"
+    CNS = "cns"
+    GANGLIA = "ganglia"
+    MUSCLE = "muscle"
+    PERITONEUM = "peritoneum"
+
+
 class TraffickingConfig(BaseModel):
     """H3R trafficking parameters (canonical units: nM, 1/h). Defaults match code constants."""
 
@@ -74,13 +92,27 @@ class PlotProxyConfig(BaseModel):
         return self
 
 
-class FormalinPhaseOverrides(BaseModel):
+class HistaminePhaseOverrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     amplitude_nm: float | None = Field(default=None, ge=0)
     t0_h: float | None = Field(default=None, ge=0)
     tau_rise_h: float | None = Field(default=None, gt=0)
     tau_fall_h: float | None = Field(default=None, gt=0)
+
+
+class HistamineProfileConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: HistamineProfileId
+    tissue: HistamineTissue = HistamineTissue.SKIN
+    h_base_nm: float | None = Field(default=None, ge=0)
+    phase1: HistaminePhaseOverrides | None = None
+    phase2: HistaminePhaseOverrides | None = None
+
+
+class FormalinPhaseOverrides(HistaminePhaseOverrides):
+    model_config = ConfigDict(extra="forbid")
 
 
 class FormalinProfileOverrides(BaseModel):
@@ -144,10 +176,10 @@ class ModelConfig(BaseModel):
     time_grid: list[float] = Field(min_length=2, description="Monotonic non-negative time points")
     time_unit: TimeUnit
 
-    initial_concentration: float = Field(gt=0)
-    concentration_unit: ConcentrationUnit
+    initial_concentration: float | None = Field(default=None)
+    concentration_unit: ConcentrationUnit | None = None
 
-    kinetics: KineticsConfig
+    kinetics: KineticsConfig | None = None
     tissues: list[TissueConfig] = Field(min_length=1)
     plots: list[PlotSpec] = Field(default_factory=list)
 
@@ -155,11 +187,21 @@ class ModelConfig(BaseModel):
         default=ParameterResolutionMode.FIXED_PARAMS_ONLY,
         description="fixed_params_only: deterministic parameters from defaults/overrides; fit is legacy-only.",
     )
+    histamine_profile: HistamineProfileConfig | None = Field(
+        default=None,
+        description=(
+            "Explicit deterministic histamine profile for Model 1. "
+            "When set, runtime uses DOCX-style profile kinetics instead of legacy PK Bateman input."
+        ),
+    )
     trafficking: TraffickingConfig | None = None
     plot_proxy: PlotProxyConfig | None = None
     formalin_profile: FormalinProfileOverrides | None = Field(
         default=None,
-        description="Whitelist overrides for default_formalin_params when model uses formalin histamine profile.",
+        description=(
+            "Legacy whitelist overrides for derived formalin parameters. "
+            "Prefer histamine_profile.profile_id='formalin' for new runtime configs."
+        ),
     )
 
     scenario_assumptions: dict[str, Any] | None = Field(
@@ -183,6 +225,32 @@ class ModelConfig(BaseModel):
 
         if any(not assumption.strip() for assumption in self.assumptions):
             raise ValueError("assumptions cannot include empty strings")
+
+        legacy_fields_present = any(
+            value is not None
+            for value in (self.initial_concentration, self.concentration_unit, self.kinetics)
+        )
+        legacy_fields_complete = all(
+            value is not None
+            for value in (self.initial_concentration, self.concentration_unit, self.kinetics)
+        )
+
+        if self.histamine_profile is None:
+            if not legacy_fields_complete:
+                raise ValueError(
+                    "Legacy Bateman input requires initial_concentration, concentration_unit, and kinetics."
+                )
+        elif legacy_fields_present and not legacy_fields_complete:
+            raise ValueError(
+                "When any legacy Bateman field is set alongside histamine_profile, "
+                "initial_concentration, concentration_unit, and kinetics must all be present."
+            )
+
+        if self.initial_concentration is not None and self.initial_concentration <= 0:
+            raise ValueError("initial_concentration must be > 0 when set")
+
+        if self.histamine_profile is not None and self.formalin_profile is not None:
+            raise ValueError("Use either histamine_profile or formalin_profile, not both.")
 
         return self
 

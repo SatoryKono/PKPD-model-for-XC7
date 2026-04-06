@@ -3,26 +3,26 @@
     {
       "algorithm": "sha256",
       "path": "simulation.csv",
-      "sha256": "8436e37aef0cbc75f0c754a76224265300f693b9fe301aec793252598867df1f",
-      "size_bytes": 498
+      "sha256": "6960f8fec4fa76bb8beb515e9a29947302dd7ae7f696f4127cc73d978ec65f11",
+      "size_bytes": 7481
     },
     {
       "algorithm": "sha256",
       "path": "marker_points.csv",
-      "sha256": "612caf273f8f0a29da7a55d0c7c2fbc83dfcd245100eeddcd7f1cd8d932e097d",
-      "size_bytes": 298
+      "sha256": "bb9c1c38cece2b37bdb45fac97dce3efd1e5476c98ee83ae499675b8defbd0ee",
+      "size_bytes": 6742
     },
     {
       "algorithm": "sha256",
       "path": "summary.csv",
-      "sha256": "7570613301e576a00bba1a6e8d68112f51db3fe4592007b625214d4ebbb10864",
-      "size_bytes": 216
+      "sha256": "b7ca70576c95f0513052609ea926888520baa853b3a076dc9c4bb7a9140b9f4b",
+      "size_bytes": 209
     },
     {
       "algorithm": "sha256",
       "path": "config.used.yaml",
-      "sha256": "e1cabd6fb979bf96e55aac34a8c7d46f6c86aee084085196c6ef72512c584d3d",
-      "size_bytes": 853
+      "sha256": "04440628d79c08c4d0a20c3246e30971d7ecf54bbf57c6afe35bf846386c2501",
+      "size_bytes": 2857
     }
   ],
   "canonical_unit_tags": {
@@ -39,8 +39,8 @@
     "--out",
     "runs/capsaicin_quickstart"
   ],
-  "config_sha256": "3fcb234b9d7a596d936cd0c231f1f1ed542178a1c6c80dec9038ed91d46eb75d",
-  "created_at_utc": "2026-04-05T22:04:56+00:00",
+  "config_sha256": "e3698fb008fb1f96c0975cba6cc49f7ddd7ae8489dfa6f4733d6d0b226196eac",
+  "created_at_utc": "2026-04-05T23:30:06+00:00",
   "deterministic_mode": true,
   "environment": {
     "platform": {
@@ -54,7 +54,9 @@
       "version": "3.14.0"
     }
   },
+  "optimization_applied": false,
+  "parameter_source": "overrides",
   "run_dir": "runs\\capsaicin_quickstart",
-  "run_id": "ceef89f1-612a-44a9-b780-c76a1c928332",
+  "run_id": "494b2a98-1c9f-4b1a-ace2-70f00d24b48f",
   "schema_version": "1.0"
 }

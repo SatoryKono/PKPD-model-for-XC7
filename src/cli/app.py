@@ -110,7 +110,7 @@ def fit() -> None:
     typer.secho(
         "Подбор least_squares не входит в поддерживаемый пайплайн. "
         "Используйте parameter_resolution: fixed_params_only (по умолчанию) и поля "
-        "trafficking / formalin_profile / plot_proxy в ModelConfig. "
+        "histamine_profile / trafficking / formalin_profile / plot_proxy в ModelConfig. "
         "См. CHANGELOG.md и docs/traceability.md.",
         err=True,
     )

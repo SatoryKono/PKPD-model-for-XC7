@@ -1,0 +1,12 @@
+metric,value
+rows,49.0
+R_surf_max,0.861111111111111
+R_int_max,0.3870371532684219
+G_signal_max,76.87412419666222
+histamine_auc_nm_h,748.3315172664503
+g_signal_auc_pct_h,197.87482655885856
+k_abs_per_h_used,
+k_elim_per_h_used,
+g_signal_ec50_nm_used,50.0
+g_signal_constitutive_activity_pct_used,5.0
+tissue_partition_weighted_volume_l_used,6.82

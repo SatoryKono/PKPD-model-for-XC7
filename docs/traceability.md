@@ -14,6 +14,7 @@
 | `compound` | То же | `src/config/schemas.py` |
 | `loss_mode` | То же | `src/config/schemas.py` (`LossMode`, `ModelConfig`); наследуется в `FitSpec` для legacy `least_squares(loss=...)` |
 | `parameter_resolution` | То же | `src/config/schemas.py` (`ParameterResolutionMode`); `fixed_params_only` по умолчанию |
+| `histamine_profile` | То же | `src/config/schemas.py` → `src/models/receptor_trafficking.py` (`build_model_params`) → `src/histamine_profiles.py` |
 | `trafficking` | То же | `src/config/schemas.py` → `src/models/receptor_trafficking.py` (`build_model_params`) |
 | `plot_proxy` | То же | `src/config/schemas.py`; EC50 для G_signal через `effective_g_signal_ec50_nm` |
 | `formalin_profile` | То же | `src/config/schemas.py` → `src/histamine_profiles.py` (`resolve_formalin_params_from_model_config`) |
@@ -31,9 +32,9 @@
 
 ## Примечания по `profile_id`
 
-- В текущем коде/схеме нет отдельного поля `profile_id`.
-- Временная практика трассируемости: использовать `model_id` как идентификатор профиля в связке с `traceability.source_in_report`.
-- Статус: **Blocked by data** — требуется формальное определение `profile_id` из ТЗ/отчёта v12.
+- Явный `profile_id` теперь задаётся в `histamine_profile.profile_id`.
+- Для legacy Bateman-конфигов трассируемость по-прежнему обеспечивается через `model_id` + `traceability.source_in_report`.
+- Для устаревшего `formalin_profile` `profile_id` определяется неявно как `formalin`.
 
 ## Blocked by data
 

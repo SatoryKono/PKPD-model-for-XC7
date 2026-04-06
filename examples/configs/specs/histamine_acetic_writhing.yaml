@@ -1,0 +1,26 @@
+schema_version: "0.1.0"
+config_kind: literature_model_spec
+implementation_status: specification_only
+model:
+  id: histamine_acetic_writhing
+  family: model_1_histamine_dynamics
+  name: acetic_writhing
+  description: Monophasic histamine release summary for the acetic-writhing model.
+units:
+  concentration: nM
+  time: min
+traceability:
+  source_type: user_extracted_literature_notes
+  source_section_mapping_status: pending
+profile:
+  profile_type: mono_phasic_summary
+  tissue:
+    code_tissue: peritoneum
+    h_peak_nm: 550.0
+    t_peak_window_start_min: 5.0
+    t_peak_window_end_min: 10.0
+  unresolved_parameters:
+    - h_base_nm
+    - phase1_t0_min
+    - phase1_tau_rise_min
+    - phase1_tau_fall_min

@@ -1,0 +1,62 @@
+{
+  "artifacts": [
+    {
+      "algorithm": "sha256",
+      "path": "simulation.csv",
+      "sha256": "ebafe3fa57e6cfdae3d7357133fa37f9558242b2860363b7302ef2378e22a912",
+      "size_bytes": 3800
+    },
+    {
+      "algorithm": "sha256",
+      "path": "marker_points.csv",
+      "sha256": "c4cd13c774565f0a57c06a49b97254ba468916c5cab529fdaa2a8108061d5c7b",
+      "size_bytes": 3397
+    },
+    {
+      "algorithm": "sha256",
+      "path": "summary.csv",
+      "sha256": "244bca6a0db02a35b96657e78ae061c5ce6438cecb82666cda5dfb26f8b34aec",
+      "size_bytes": 208
+    },
+    {
+      "algorithm": "sha256",
+      "path": "config.used.yaml",
+      "sha256": "7e35b43bbc0eaefdd74567b0f1bc8556d2493984f6408efd887954749da85ddc",
+      "size_bytes": 1961
+    }
+  ],
+  "canonical_unit_tags": {
+    "concentration": "nM",
+    "rate": "1/h",
+    "time": "h"
+  },
+  "canonical_units": true,
+  "command": [
+    "C:\\Users\\HP3168\\Documents\\GitHub\\PKPD-model-for-XC7\\src\\cli\\app.py",
+    "simulate",
+    "--config",
+    "examples/configs/formalin.yaml",
+    "--out",
+    "runs/formalin_quickstart"
+  ],
+  "config_sha256": "cfee575f483b9fcb820e1fc162046d633a073ef41d155cddf3144149206d5719",
+  "created_at_utc": "2026-04-05T23:54:15+00:00",
+  "deterministic_mode": true,
+  "environment": {
+    "platform": {
+      "machine": "AMD64",
+      "release": "10",
+      "system": "Windows"
+    },
+    "python": {
+      "executable": "C:\\Users\\HP3168\\Documents\\GitHub\\PKPD-model-for-XC7\\.venv\\Scripts\\python.exe",
+      "implementation": "CPython",
+      "version": "3.14.0"
+    }
+  },
+  "optimization_applied": false,
+  "parameter_source": "overrides",
+  "run_dir": "runs\\formalin_quickstart",
+  "run_id": "583e5661-b938-4eb3-b452-7fb1ed2f0b4f",
+  "schema_version": "1.0"
+}

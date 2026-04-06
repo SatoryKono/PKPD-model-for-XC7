@@ -53,6 +53,7 @@ def test_run_simulation_is_pure_and_deterministic_without_filesystem() -> None:
         "R_surf",
         "R_int",
         "histamine_nm",
+        "G_signal",
         "k_abs_per_h",
         "k_elim_per_h",
         "tissue_partition_weighted_volume_l",
@@ -80,3 +81,82 @@ def test_persist_run_writes_csv_yaml_and_metadata(tmp_path: Path) -> None:
     assert {"simulation.csv", "marker_points.csv", "summary.csv", "config.used.yaml"}.issubset(
         recorded_paths
     )
+
+
+def test_run_simulation_supports_profile_driven_histamine_input() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "capsaicin_profile_run",
+            "compound": "capsaicin",
+            "loss_mode": "mse",
+            "assumptions": ["profile_driven_histamine"],
+            "traceability": {
+                "source_in_report": "DOCX capsaicin model",
+                "source_reference": "tests",
+                "source_version": "1",
+            },
+            "time_grid": [0.0, 0.25, 0.5, 1.0, 2.0],
+            "time_unit": "h",
+            "tissues": [
+                {
+                    "name": "skin",
+                    "volume": 1.0,
+                    "volume_unit": "L",
+                    "partition_coeff": 1.0,
+                }
+            ],
+            "plots": [],
+            "histamine_profile": {
+                "profile_id": "capsaicin",
+                "tissue": "skin",
+            },
+        }
+    )
+
+    result = api.run_simulation(cfg)
+    assert result.timeseries["histamine_nm"].iloc[0] == 50.0
+    assert result.timeseries["histamine_nm"].max() > 50.0
+    assert result.timeseries["G_signal"].iloc[0] > 0.0
+    assert result.timeseries["G_signal"].max() > result.timeseries["G_signal"].iloc[0]
+    assert result.timeseries["k_abs_per_h"].isna().all()
+    assert result.timeseries["k_elim_per_h"].isna().all()
+
+
+def test_run_simulation_supports_formalin_profile_driven_histamine_input() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "formalin_profile_run",
+            "compound": "histamine",
+            "loss_mode": "mse",
+            "assumptions": ["profile_driven_histamine"],
+            "traceability": {
+                "source_in_report": "DOCX formalin model",
+                "source_reference": "tests",
+                "source_version": "1",
+            },
+            "time_grid": [0.0, 0.03, 0.06, 0.1, 0.15, 0.25, 0.5, 0.6, 1.0, 2.0, 4.0],
+            "time_unit": "h",
+            "tissues": [
+                {
+                    "name": "skin",
+                    "volume": 1.0,
+                    "volume_unit": "L",
+                    "partition_coeff": 1.0,
+                }
+            ],
+            "plots": [],
+            "histamine_profile": {
+                "profile_id": "formalin",
+                "tissue": "skin",
+            },
+        }
+    )
+
+    result = api.run_simulation(cfg)
+    assert result.timeseries["histamine_nm"].iloc[0] == 50.0
+    assert result.timeseries["histamine_nm"].max() >= 390.0
+    assert result.timeseries["histamine_nm"].max() <= 1000.0
+    assert result.timeseries["G_signal"].iloc[0] > 0.0
+    assert result.timeseries["G_signal"].max() > result.timeseries["G_signal"].iloc[0]
+    assert result.timeseries["k_abs_per_h"].isna().all()
+    assert result.timeseries["k_elim_per_h"].isna().all()

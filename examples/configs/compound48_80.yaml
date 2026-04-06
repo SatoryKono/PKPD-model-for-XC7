@@ -1,26 +1,20 @@
 # Expected marker_points.csv (first 3 lines):
-# time_h,mast_cell_activation_nM,marker
-# 0.0,1200.0,challenge_start
-# 0.5,840.0,rapid_response
+# time_h,histamine_nm,marker
+# 0.0,50.0,baseline
+# 0.5,>50.0,biphasic_response
 
 model_id: compound48_80_pkpd_v2
 compound: compound48_80
 loss_mode: mse
 assumptions:
-  - instant_distribution_in_plasma
-  - receptor_driven_response_proxy
+  - docx_profile_driven_histamine_model
+  - compound48_80_biphasic_histamine_release
 traceability:
-  source_in_report: "Compound 48/80 challenge dataset (internal assay A17)"
-  source_reference: "lab-notebook://assay-A17"
-  source_version: "2025-12"
+  source_in_report: "DOCX v12, Модель 1: Динамика концентрации гистамина"
+  source_reference: "ДИНАМИКА_ГИСТАМИНА_И_ФАРМАКОДИНАМИКА_H3-РЕЦЕПТОРОВ_v12.docx"
+  source_version: "v12"
 time_grid: [0, 0.5, 1.0, 2.0, 4.0, 8.0]
 time_unit: h
-initial_concentration: 0.0012
-concentration_unit: mM
-kinetics:
-  k_abs: 0.6
-  k_elim: 0.11
-  rate_unit: 1/h
 tissues:
   - name: plasma
     volume: 2.8
@@ -32,9 +26,32 @@ tissues:
     partition_coeff: 0.8
 plots:
   - id: activation_response
-    title: Mast-cell activation proxy
+    title: Histamine concentration over time
     plot_type: log_line
     x: time
-    y: mast_cell_activation
+    y: histamine_concentration
     x_unit: h
     y_unit: nM
+histamine_profile:
+  profile_id: compound48_80
+  tissue: skin
+  h_base_nm: 50.0
+  phase1:
+    amplitude_nm: 1500.0
+    t0_h: 0.0
+    tau_rise_h: 0.08333333333333333
+    tau_fall_h: 0.3333333333333333
+  phase2:
+    amplitude_nm: 250.0
+    t0_h: 1.0
+    tau_rise_h: 0.6666666666666666
+    tau_fall_h: 2.0
+trafficking:
+  k_int_max: 2.5
+  k_rec: 0.5
+  k_synth: 0.05
+  ec50_barr_nm: 1500.0
+  hill_n: 1.0
+  ec50_g_nm: 50.0
+plot_proxy:
+  g_signal_ec50_nm: 50.0

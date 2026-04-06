@@ -32,6 +32,50 @@ BASAL_HISTAMINE_NM: dict[Tissue, float] = {
     Tissue.PERITONEUM: 50.0,
 }
 
+# Formalin summary values extracted from the user-provided literature notes.
+# The reported summary does not uniquely define the full pulse kinetics, so the
+# phase-shape ratios below are an explicit model contract rather than a hidden
+# default. They are shared across tissues and scaled by the reported t1/2.
+FORMALIN_PHASE1_TAU_RISE_TO_HALF_LIFE = 0.20
+FORMALIN_PHASE1_TAU_FALL_TO_HALF_LIFE = 0.80
+FORMALIN_PHASE2_T0_TO_HALF_LIFE = 20.0 / 9.0
+FORMALIN_PHASE2_TAU_RISE_TO_HALF_LIFE = 1.0
+FORMALIN_PHASE2_TAU_FALL_TO_HALF_LIFE = 48.0 / 9.0
+
+
+@dataclass(frozen=True)
+class FormalinSummary:
+    tissue: Tissue
+    h_base_nm: float
+    h_peak_i_nm: float
+    h_peak_ii_nm: float
+    t_half_min: float
+
+
+FORMALIN_SUMMARY_BY_TISSUE: dict[Tissue, FormalinSummary] = {
+    Tissue.SKIN: FormalinSummary(
+        tissue=Tissue.SKIN,
+        h_base_nm=50.0,
+        h_peak_i_nm=1000.0,
+        h_peak_ii_nm=400.0,
+        t_half_min=9.0,
+    ),
+    Tissue.CNS: FormalinSummary(
+        tissue=Tissue.CNS,
+        h_base_nm=2.0,
+        h_peak_i_nm=6.0,
+        h_peak_ii_nm=10.0,
+        t_half_min=87.0,
+    ),
+    Tissue.GANGLIA: FormalinSummary(
+        tissue=Tissue.GANGLIA,
+        h_base_nm=5.0,
+        h_peak_i_nm=10.0,
+        h_peak_ii_nm=15.0,
+        t_half_min=28.0,
+    ),
+}
+
 
 @dataclass(frozen=True)
 class PulsePhase:
@@ -176,25 +220,144 @@ def _baseline_for_tissue(tissue: Tissue) -> float:
         raise ValueError(f"Unsupported tissue: {tissue}") from exc
 
 
-def default_formalin_params(tissue: Tissue = Tissue.SKIN) -> HistamineProfileParams:
-    h_base = _baseline_for_tissue(tissue)
-    return HistamineProfileParams(
-        profile_type=ProfileType.BI,
-        tissue=tissue,
-        h_base_nm=h_base,
-        phase1=PulsePhase(
-            amplitude_nm=max(1000.0 - h_base, 0.0),
-            t0_h=0.0,
-            tau_rise_h=0.03,
-            tau_fall_h=0.12,
-        ),
-        phase2=PulsePhase(
-            amplitude_nm=400.0,
-            t0_h=20.0 / 60.0,
-            tau_rise_h=0.15,
-            tau_fall_h=0.80,
+def formalin_summary_for_tissue(tissue: Tissue = Tissue.SKIN) -> FormalinSummary:
+    try:
+        return FORMALIN_SUMMARY_BY_TISSUE[tissue]
+    except KeyError as exc:
+        raise ValueError(f"Formalin summary is not available for tissue: {tissue}") from exc
+
+
+def _minutes_to_hours(value_min: float) -> float:
+    return float(value_min) / 60.0
+
+
+def _derive_formalin_phase_from_summary(
+    *,
+    peak_nm: float,
+    baseline_nm: float,
+    t_half_min: float,
+    t0_min: float,
+    tau_rise_to_half_life: float,
+    tau_fall_to_half_life: float,
+    residual_nm_at_peak: float = 0.0,
+) -> PulsePhase:
+    if t_half_min <= 0:
+        raise ValueError("t_half_min must be > 0")
+    if peak_nm < baseline_nm:
+        raise ValueError("peak_nm must be >= baseline_nm")
+    if residual_nm_at_peak < 0:
+        raise ValueError("residual_nm_at_peak must be >= 0")
+
+    tau_rise_h = _minutes_to_hours(t_half_min * tau_rise_to_half_life)
+    tau_fall_h = _minutes_to_hours(t_half_min * tau_fall_to_half_life)
+    amplitude_nm = float(peak_nm - baseline_nm - residual_nm_at_peak)
+    if amplitude_nm <= 0:
+        raise ValueError(
+            "Derived formalin pulse amplitude must be > 0 after subtracting baseline and residual contribution"
+        )
+
+    phase = PulsePhase(
+        amplitude_nm=amplitude_nm,
+        t0_h=_minutes_to_hours(t0_min),
+        tau_rise_h=tau_rise_h,
+        tau_fall_h=tau_fall_h,
+    )
+    _validate_phase(phase)
+    return phase
+
+
+def _resolve_formalin_phase2_amplitude_nm(
+    *,
+    baseline_nm: float,
+    target_peak_nm: float,
+    phase1: PulsePhase,
+    phase2_template: PulsePhase,
+) -> float:
+    if target_peak_nm <= baseline_nm:
+        raise ValueError("target_peak_nm must be > baseline_nm")
+
+    window_end_h = phase2_template.t0_h + (8.0 * phase2_template.tau_fall_h)
+    time_grid_h = np.linspace(phase2_template.t0_h, window_end_h, 4097)
+    phase1_component = _pulse_component(time_grid_h, phase1)
+    unit_phase2 = _pulse_component(
+        time_grid_h,
+        PulsePhase(
+            amplitude_nm=1.0,
+            t0_h=phase2_template.t0_h,
+            tau_rise_h=phase2_template.tau_rise_h,
+            tau_fall_h=phase2_template.tau_fall_h,
         ),
     )
+    target_excess_nm = float(target_peak_nm - baseline_nm)
+    if float(np.max(phase1_component)) >= target_excess_nm:
+        raise ValueError("Phase1 contribution already exceeds target formalin phase2 peak")
+
+    low = 0.0
+    high = max(target_excess_nm, 1.0)
+    combined_high = phase1_component + (unit_phase2 * high)
+    while float(np.max(combined_high)) < target_excess_nm:
+        high *= 2.0
+        combined_high = phase1_component + (unit_phase2 * high)
+
+    for _ in range(80):
+        mid = (low + high) / 2.0
+        combined_mid = phase1_component + (unit_phase2 * mid)
+        if float(np.max(combined_mid)) < target_excess_nm:
+            low = mid
+        else:
+            high = mid
+
+    amplitude_nm = high
+    if amplitude_nm <= 0:
+        raise ValueError("Derived formalin phase2 amplitude must be > 0")
+    return float(amplitude_nm)
+
+
+def derive_formalin_params_from_summary(tissue: Tissue = Tissue.SKIN) -> HistamineProfileParams:
+    summary = formalin_summary_for_tissue(tissue)
+
+    phase1 = _derive_formalin_phase_from_summary(
+        peak_nm=summary.h_peak_i_nm,
+        baseline_nm=summary.h_base_nm,
+        t_half_min=summary.t_half_min,
+        t0_min=0.0,
+        tau_rise_to_half_life=FORMALIN_PHASE1_TAU_RISE_TO_HALF_LIFE,
+        tau_fall_to_half_life=FORMALIN_PHASE1_TAU_FALL_TO_HALF_LIFE,
+    )
+
+    phase2_template = _derive_formalin_phase_from_summary(
+        peak_nm=summary.h_peak_ii_nm,
+        baseline_nm=summary.h_base_nm,
+        t_half_min=summary.t_half_min,
+        t0_min=summary.t_half_min * FORMALIN_PHASE2_T0_TO_HALF_LIFE,
+        tau_rise_to_half_life=FORMALIN_PHASE2_TAU_RISE_TO_HALF_LIFE,
+        tau_fall_to_half_life=FORMALIN_PHASE2_TAU_FALL_TO_HALF_LIFE,
+        residual_nm_at_peak=0.0,
+    )
+    phase2_amplitude_nm = _resolve_formalin_phase2_amplitude_nm(
+        baseline_nm=summary.h_base_nm,
+        target_peak_nm=summary.h_peak_ii_nm,
+        phase1=phase1,
+        phase2_template=phase2_template,
+    )
+    phase2 = PulsePhase(
+        amplitude_nm=phase2_amplitude_nm,
+        t0_h=phase2_template.t0_h,
+        tau_rise_h=phase2_template.tau_rise_h,
+        tau_fall_h=phase2_template.tau_fall_h,
+    )
+
+    return HistamineProfileParams(
+        profile_type=ProfileType.BI,
+        tissue=summary.tissue,
+        h_base_nm=summary.h_base_nm,
+        phase1=phase1,
+        phase2=phase2,
+    )
+
+
+def default_formalin_params(tissue: Tissue = Tissue.SKIN) -> HistamineProfileParams:
+    return derive_formalin_params_from_summary(tissue)
 
 
 def default_compound48_80_params(tissue: Tissue = Tissue.SKIN) -> HistamineProfileParams:
@@ -313,7 +476,7 @@ def resolve_formalin_params(
     tissue: Tissue = Tissue.SKIN,
     overrides: Any | None = None,
 ) -> HistamineProfileParams:
-    """Defaults from ``default_formalin_params`` plus optional whitelist ``overrides`` (validated)."""
+    """Derived formalin summary parameters plus optional whitelist ``overrides`` (validated)."""
 
     from src.config.schemas import FormalinProfileOverrides
 
@@ -416,7 +579,11 @@ __all__ = [
     "Tissue",
     "PulsePhase",
     "HistamineProfileParams",
+    "FormalinSummary",
     "BASAL_HISTAMINE_NM",
+    "FORMALIN_SUMMARY_BY_TISSUE",
+    "formalin_summary_for_tissue",
+    "derive_formalin_params_from_summary",
     "resolve_formalin_params",
     "resolve_formalin_params_from_model_config",
     "formalin_histamine",

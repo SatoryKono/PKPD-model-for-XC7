@@ -12,7 +12,14 @@
 python -m src.cli.app simulate --config examples/configs/capsaicin.yaml --out runs/capsaicin_quickstart
 ```
 
+Формалиновый тест:
+
+```bash
+python -m src.cli.app simulate --config examples/configs/formalin.yaml --out runs/formalin_quickstart
+```
+
 Ожидаемые артефакты в `runs/capsaicin_quickstart/`:
+
 - `simulation.csv`
 - `marker_points.csv`
 - `summary.csv`
@@ -31,7 +38,7 @@ python -m src.cli.app validate --run-dir runs/capsaicin_quickstart --reference r
 
 ## Полные примеры конфигов
 
-Ниже — два полных рабочих примера конфигов.
+Ниже — полные рабочие примеры конфигов.
 
 ### Пример 1: `capsaicin.yaml`
 
@@ -40,20 +47,14 @@ model_id: capsaicin_pkpd_v1
 compound: capsaicin
 loss_mode: huber
 assumptions:
-  - one_compartment_absorption_model
-  - first_order_elimination
+  - docx_profile_driven_histamine_model
+  - capsaicin_monophasic_histamine_release
 traceability:
-  source_in_report: "Capsaicin pilot in-vivo study, report table 2"
-  source_reference: "doi:10.0000/example-capsaicin"
-  source_version: "2026-01"
+  source_in_report: "DOCX v12, Модель 1: Динамика концентрации гистамина"
+  source_reference: "ДИНАМИКА_ГИСТАМИНА_И_ФАРМАКОДИНАМИКА_H3-РЕЦЕПТОРОВ_v12.docx"
+  source_version: "v12"
 time_grid: [0, 30, 60, 120, 240]
 time_unit: min
-initial_concentration: 0.25
-concentration_unit: uM
-kinetics:
-  k_abs: 0.08
-  k_elim: 0.015
-  rate_unit: 1/min
 tissues:
   - name: plasma
     volume: 2.5
@@ -65,14 +66,32 @@ tissues:
     partition_coeff: 3.6
 plots:
   - id: plasma_curve
-    title: Plasma concentration over time
+    title: Histamine concentration over time
     plot_type: line
     x: time
-    y: plasma_concentration
+    y: histamine_concentration
     x_unit: min
-    y_unit: uM
+    y_unit: nM
+histamine_profile:
+  profile_id: capsaicin
+  tissue: skin
+  h_base_nm: 50.0
+  phase1:
+    amplitude_nm: 150.0
+    t0_h: 0.0
+    tau_rise_h: 0.16666666666666666
+    tau_fall_h: 0.6666666666666666
+trafficking:
+  k_int_max: 2.5
+  k_rec: 0.5
+  k_synth: 0.05
+  ec50_barr_nm: 1500.0
+  hill_n: 1.0
+  ec50_g_nm: 50.0
+plot_proxy:
+  g_signal_ec50_nm: 50.0
 scenario_assumptions:
-  dermal_absorption_multiplier: 1.15
+  clip_state_explicit: false
 ```
 
 ### Пример 2: `compound48_80.yaml`
@@ -82,20 +101,14 @@ model_id: compound48_80_pkpd_v2
 compound: compound48_80
 loss_mode: mse
 assumptions:
-  - instant_distribution_in_plasma
-  - receptor_driven_response_proxy
+  - docx_profile_driven_histamine_model
+  - compound48_80_biphasic_histamine_release
 traceability:
-  source_in_report: "Compound 48/80 challenge dataset (internal assay A17)"
-  source_reference: "lab-notebook://assay-A17"
-  source_version: "2025-12"
+  source_in_report: "DOCX v12, Модель 1: Динамика концентрации гистамина"
+  source_reference: "ДИНАМИКА_ГИСТАМИНА_И_ФАРМАКОДИНАМИКА_H3-РЕЦЕПТОРОВ_v12.docx"
+  source_version: "v12"
 time_grid: [0, 0.5, 1.0, 2.0, 4.0, 8.0]
 time_unit: h
-initial_concentration: 0.0012
-concentration_unit: mM
-kinetics:
-  k_abs: 0.6
-  k_elim: 0.11
-  rate_unit: 1/h
 tissues:
   - name: plasma
     volume: 2.8
@@ -107,12 +120,66 @@ tissues:
     partition_coeff: 0.8
 plots:
   - id: activation_response
-    title: Mast-cell activation proxy
+    title: Histamine concentration over time
     plot_type: log_line
     x: time
-    y: mast_cell_activation
+    y: histamine_concentration
     x_unit: h
     y_unit: nM
+histamine_profile:
+  profile_id: compound48_80
+  tissue: skin
+  h_base_nm: 50.0
+  phase1:
+    amplitude_nm: 1500.0
+    t0_h: 0.0
+    tau_rise_h: 0.08333333333333333
+    tau_fall_h: 0.3333333333333333
+  phase2:
+    amplitude_nm: 250.0
+    t0_h: 1.0
+    tau_rise_h: 0.6666666666666666
+    tau_fall_h: 2.0
+trafficking:
+  k_int_max: 2.5
+  k_rec: 0.5
+  k_synth: 0.05
+  ec50_barr_nm: 1500.0
+  hill_n: 1.0
+  ec50_g_nm: 50.0
+plot_proxy:
+  g_signal_ec50_nm: 50.0
+```
+
+### Пример 3: `formalin.yaml`
+
+```yaml
+model_id: formalin_histamine_skin_v1
+compound: formalin
+loss_mode: huber
+assumptions:
+  - docx_profile_driven_histamine_model
+  - formalin_biphasic_histamine_release
+  - phase_shape_ratios_scaled_from_reported_t_half
+traceability:
+  source_in_report: "DOCX v12, Модель 1: Формалиновый тест"
+  source_reference: "ДИНАМИКА_ГИСТАМИНА_И_ФАРМАКОДИНАМИКА_H3-РЕЦЕПТОРОВ_v12.docx"
+  source_version: "v12"
+time_grid: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
+time_unit: min
+tissues:
+  - name: plasma
+    volume: 2.5
+    volume_unit: L
+    partition_coeff: 1.0
+  - name: skin
+    volume: 1.2
+    volume_unit: L
+    partition_coeff: 3.6
+plots: []
+histamine_profile:
+  profile_id: formalin
+  tissue: skin
 ```
 
 ---
@@ -139,6 +206,5 @@ time_h,R_surf,R_int,histamine_nm
 ## Пояснение полей `loss_mode` и `profile_id`
 
 - `loss_mode` — обязательное поле конфига оптимизации/сопоставления; поддерживаемые значения: `mse`, `mae`, `huber`, `nll`.
-- `profile_id` — в текущей схеме `ModelConfig` поле **отсутствует**. Для трассируемости профиля используйте `model_id` + `traceability.source_in_report` до появления явного поля в утверждённом ТЗ/отчёте.
-
-Статус по `profile_id`: **Blocked by data** (входные артефакты с формальным определением поля не приложены в репозитории).
+- `profile_id` — теперь задаётся явно в `histamine_profile.profile_id` для profile-driven Model 1.
+- Если конфиг использует legacy Bateman-вход, явный `profile_id` можно не задавать; в этом случае трассируемость обеспечивается через `model_id` + `traceability.source_in_report`.

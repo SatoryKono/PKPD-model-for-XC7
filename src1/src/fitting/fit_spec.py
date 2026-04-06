@@ -102,7 +102,6 @@ class FitSpec:
             )
 
 
-
 def fit_spec_to_dict(spec: FitSpec) -> dict[str, Any]:
     """Return a JSON-serializable structure for reporting."""
 

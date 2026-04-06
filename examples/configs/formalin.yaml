@@ -1,0 +1,54 @@
+# Expected marker_points.csv (first 3 lines):
+# time_h,histamine_nm,marker
+# 0.0,50.0,baseline
+# 0.05,>50.0,phase_i_rise
+
+model_id: formalin_histamine_skin_v1
+compound: formalin
+loss_mode: huber
+assumptions:
+  - docx_profile_driven_histamine_model
+  - formalin_biphasic_histamine_release
+  - phase_shape_ratios_scaled_from_reported_t_half
+traceability:
+  source_in_report: "DOCX v12, Модель 1: Формалиновый тест"
+  source_reference: "ДИНАМИКА_ГИСТАМИНА_И_ФАРМАКОДИНАМИКА_H3-РЕЦЕПТОРОВ_v12.docx"
+  source_version: "v12"
+time_grid:
+  [
+    0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120,
+    125, 130, 135, 140, 145, 150, 155, 160, 165, 170, 175, 180, 185, 190, 195, 200, 205, 210, 215, 220, 225,
+    230, 235, 240,
+  ]
+time_unit: min
+tissues:
+  - name: plasma
+    volume: 2.5
+    volume_unit: L
+    partition_coeff: 1.0
+  - name: skin
+    volume: 1.2
+    volume_unit: L
+    partition_coeff: 3.6
+plots:
+  - id: histamine_curve
+    title: Formalin histamine concentration over time
+    plot_type: line
+    x: time
+    y: histamine_concentration
+    x_unit: min
+    y_unit: nM
+histamine_profile:
+  profile_id: formalin
+  tissue: skin
+trafficking:
+  k_int_max: 2.5
+  k_rec: 0.5
+  k_synth: 0.05
+  ec50_barr_nm: 1500.0
+  hill_n: 1.0
+  ec50_g_nm: 50.0
+plot_proxy:
+  g_signal_ec50_nm: 50.0
+scenario_assumptions:
+  clip_state_explicit: false

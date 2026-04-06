@@ -60,3 +60,26 @@ def test_snapshot_data_uses_configurable_ec50_when_provided(tmp_path: Path) -> N
 
     expected_custom_g = (source["R_surf"] * source["histamine_nm"]) / (50.0 + source["histamine_nm"])
     assert gsig["G_signal"].round(12).tolist() == expected_custom_g.round(12).tolist()
+
+
+def test_snapshot_data_prefers_existing_g_signal_column(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    frame = pd.DataFrame(
+        {
+            "time_h": [0.0, 1.0, 2.0],
+            "R_surf": [1.0, 0.8, 0.6],
+            "R_int": [0.0, 0.2, 0.4],
+            "histamine_nm": [0.0, 100.0, 200.0],
+            "G_signal": [5.0, 25.0, 40.0],
+        }
+    )
+    frame.to_csv(run_dir / "simulation.csv", index=False)
+
+    artifacts = generate_unified_artifacts(run_dir, config_meta={"ec50_nm": 50.0})
+    gsig = pd.read_csv(artifacts.plot_snapshots["gsignaling"])
+
+    assert gsig.to_dict(orient="list") == {
+        "time_h": [0.0, 1.0, 2.0],
+        "G_signal": [5.0, 25.0, 40.0],
+    }

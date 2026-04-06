@@ -1,0 +1,43 @@
+schema_version: "0.1.0"
+config_kind: literature_model_spec
+implementation_status: specification_only
+model:
+  id: h3r_g_signaling
+  family: model_3_h3r_g_signaling
+  name: h3r_g_signaling
+  description: G-signaling readout coupled to histamine occupancy and surface receptor fraction.
+  input_dependencies:
+    - h3r_internalization
+units:
+  concentration: nM
+  constitutive_activity: fraction
+  output: percent
+traceability:
+  source_type: user_extracted_literature_notes
+  source_section_mapping_status: pending
+equations:
+  g_act_percent: ([CA + (1 - CA) * H^n / (EC50_G^n + H^n)] * R_surf) * 100
+parameters:
+  ec50_g_nm: 50.0
+  hill_n: 1.0
+constitutive_activity_by_tissue:
+  skin:
+    code_tissue: skin
+    ca_fraction: 0.05
+    reported_percent_min: 5.0
+    reported_percent_max: 5.0
+  sympathetic_ganglia:
+    code_tissue: ganglia
+    ca_fraction: 0.10
+    reported_percent_min: 10.0
+    reported_percent_max: 15.0
+  spinal_cord:
+    code_tissue: cns
+    ca_fraction: 0.25
+    reported_percent_min: 15.0
+    reported_percent_max: 35.0
+selection_policy:
+  default_rule: use_explicit_default_fraction
+  ambiguity_handling:
+    - Keep literature ranges for traceability.
+    - Use a single default fraction in deterministic runs.

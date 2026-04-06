@@ -10,6 +10,8 @@ from src.validation.rounding_spec import RoundingSpec
 
 REPORT_DIR = Path(__file__).resolve().parents[1] / "report_v12_extracted"
 
+pytestmark = pytest.mark.regression_data
+
 
 @pytest.mark.parametrize(
     ("model_key", "xfail_reason"),

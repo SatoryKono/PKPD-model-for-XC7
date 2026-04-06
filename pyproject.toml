@@ -38,5 +38,17 @@ where = ["."]
 include = ["src*"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+minversion = "8.0"
 testpaths = ["tests"]
+pythonpath = ["."]
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--tb=short",
+]
+markers = [
+  "regression_data: тесты с внешним report_v12_extracted (могут xfail/skip)",
+  "snapshot: снапшоты pytest-regtest (нужен пакет pytest-regtest)",
+  "integration: интеграция API/CLI и файловой системы",
+]
+norecursedirs = [".git", ".venv", "venv", "env", "dist", "build", "*.egg-info"]

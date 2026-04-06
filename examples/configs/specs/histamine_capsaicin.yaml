@@ -1,0 +1,23 @@
+schema_version: "0.1.0"
+config_kind: literature_model_spec
+implementation_status: specification_only
+model:
+  id: histamine_capsaicin
+  family: model_1_histamine_dynamics
+  name: capsaicin
+  description: Monophasic histamine release driven by capsaicin challenge.
+units:
+  concentration: nM
+  time: min
+traceability:
+  source_type: user_extracted_literature_notes
+  source_section_mapping_status: pending
+profile:
+  profile_type: mono_phasic_pulse
+  tissue:
+    code_tissue: skin
+    h_base_nm: 50.0
+  phase1:
+    amplitude_nm: 150.0
+    tau_rise_min: 10.0
+    tau_fall_min: 40.0

@@ -134,3 +134,90 @@ def test_histamine_input_profile_responds_to_kinetics() -> None:
     params = build_model_params(cfg)
     at_1h = histamine_input_profile(1.0, params)
     assert at_1h > 0.0
+
+
+def test_build_model_params_uses_explicit_capsaicin_histamine_profile() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "capsaicin_profile_model",
+            "compound": "capsaicin",
+            "loss_mode": "mse",
+            "assumptions": ["unit_test_assumption"],
+            "traceability": {"source_in_report": "Unit test source"},
+            "time_grid": [0.0, 0.25, 0.5, 1.0],
+            "time_unit": "h",
+            "tissues": [
+                {"name": "plasma", "volume": 1.0, "volume_unit": "L", "partition_coeff": 1.0}
+            ],
+            "plots": [],
+            "histamine_profile": {
+                "profile_id": "capsaicin",
+                "tissue": "skin",
+            },
+        }
+    )
+
+    mp = build_model_params(cfg)
+    assert mp.histamine_source == "capsaicin"
+    assert mp.k_abs_per_h is None
+    assert mp.k_elim_per_h is None
+    assert np.isclose(histamine_input_profile(0.0, mp), 50.0)
+    assert histamine_input_profile(0.25, mp) > 50.0
+
+
+def test_build_model_params_applies_histamine_profile_phase_override() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "capsaicin_override_model",
+            "compound": "capsaicin",
+            "loss_mode": "mse",
+            "assumptions": ["unit_test_assumption"],
+            "traceability": {"source_in_report": "Unit test source"},
+            "time_grid": [0.0, 1.0],
+            "time_unit": "h",
+            "tissues": [
+                {"name": "plasma", "volume": 1.0, "volume_unit": "L", "partition_coeff": 1.0}
+            ],
+            "plots": [],
+            "histamine_profile": {
+                "profile_id": "capsaicin",
+                "tissue": "skin",
+                "phase1": {"amplitude_nm": 200.0},
+            },
+        }
+    )
+
+    mp = build_model_params(cfg)
+    assert mp.histamine_profile is not None
+    assert np.isclose(mp.histamine_profile.phase1.amplitude_nm, 200.0)
+
+
+def test_build_model_params_uses_formalin_histamine_profile_without_legacy_pk_fields() -> None:
+    cfg = ModelConfig.model_validate(
+        {
+            "model_id": "formalin_profile_model",
+            "compound": "histamine",
+            "loss_mode": "mse",
+            "assumptions": ["unit_test_assumption"],
+            "traceability": {"source_in_report": "Unit test source"},
+            "time_grid": [0.0, 0.25, 0.5, 1.0, 2.0, 4.0],
+            "time_unit": "h",
+            "tissues": [
+                {"name": "skin", "volume": 1.0, "volume_unit": "L", "partition_coeff": 1.0}
+            ],
+            "plots": [],
+            "histamine_profile": {
+                "profile_id": "formalin",
+                "tissue": "skin",
+            },
+        }
+    )
+
+    mp = build_model_params(cfg)
+    assert mp.histamine_source == "formalin"
+    assert mp.histamine_profile is not None
+    assert np.isclose(mp.histamine_profile.h_base_nm, 50.0)
+    assert mp.k_abs_per_h is None
+    assert mp.k_elim_per_h is None
+    assert np.isclose(histamine_input_profile(0.0, mp), 50.0)
+    assert histamine_input_profile(0.25, mp) > 50.0

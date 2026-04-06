@@ -1,0 +1,99 @@
+schema_version: "0.1.0"
+config_kind: literature_model_spec
+implementation_status: specification_only
+model:
+  id: model_1_histamine_dynamics
+  name: histamine_dynamics
+  description: Histamine concentration drivers extracted from literature notes for pain-model scenarios.
+  downstream_consumers:
+    - model_2_h3r_internalization
+    - model_3_h3r_g_signaling
+units:
+  concentration: nM
+  time: min
+traceability:
+  source_type: user_extracted_literature_notes
+  source_section_mapping_status: pending
+submodels:
+  formalin:
+    profile_type: bi_phasic_summary
+    calibration_notes:
+      - Peaks and half-life are available from the extracted table.
+      - Phase onset and rise/fall constants remain to be derived during code implementation.
+    tissues:
+      skin:
+        code_tissue: skin
+        h_base_nm: 50.0
+        h_peak_i_nm: 1000.0
+        h_peak_ii_nm: 400.0
+        t_half_min: 9.0
+      spinal_cord:
+        code_tissue: cns
+        h_base_nm: 2.0
+        h_peak_i_nm: 6.0
+        h_peak_ii_nm: 10.0
+        t_half_min: 87.0
+      sympathetic_ganglia:
+        code_tissue: ganglia
+        h_base_nm: 5.0
+        h_peak_i_nm: 10.0
+        h_peak_ii_nm: 15.0
+        t_half_min: 28.0
+    unresolved_parameters:
+      - phase1_t0_min
+      - phase1_tau_rise_min
+      - phase1_tau_fall_min
+      - phase2_t0_min
+      - phase2_tau_rise_min
+      - phase2_tau_fall_min
+  compound48_80:
+    profile_type: bi_phasic_pulse
+    tissue:
+      code_tissue: skin
+      h_base_nm: 50.0
+    phase1:
+      amplitude_nm: 1500.0
+      tau_rise_min: 5.0
+      tau_fall_min: 20.0
+    phase2:
+      amplitude_nm: 250.0
+      t0_min: 60.0
+      tau_rise_min: 40.0
+      tau_fall_min: 120.0
+  capsaicin:
+    profile_type: mono_phasic_pulse
+    tissue:
+      code_tissue: skin
+      h_base_nm: 50.0
+    phase1:
+      amplitude_nm: 150.0
+      tau_rise_min: 10.0
+      tau_fall_min: 40.0
+  hot_plate:
+    profile_type: peak_constrained_pulse
+    calibration_notes:
+      - Only baseline, peak magnitude, and approximate peak time are explicitly reported.
+      - Rise/fall constants remain to be fit under deterministic calibration rules.
+    tissue:
+      code_tissue: skin
+      h_base_nm: 50.0
+      h_peak_nm: 262.0
+      t_peak_min: 1.0
+    unresolved_parameters:
+      - phase1_t0_min
+      - phase1_tau_rise_min
+      - phase1_tau_fall_min
+  acetic_writhing:
+    profile_type: mono_phasic_summary
+    calibration_notes:
+      - Monophasic release is reported with a peak window rather than full kinetic constants.
+    tissue:
+      code_tissue: peritoneum
+      h_peak_nm: 550.0
+      t_peak_window_start_min: 5.0
+      t_peak_window_end_min: 10.0
+    unresolved_parameters:
+      - h_base_nm
+      - phase1_t0_min
+      - phase1_tau_rise_min
+      - phase1_tau_fall_min

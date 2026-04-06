@@ -9,8 +9,11 @@ import yaml
 
 from src.config.schemas import FormalinPhaseOverrides, FormalinProfileOverrides, ModelConfig
 from src.histamine_profiles import (
+    Tissue,
     default_formalin_params,
+    derive_formalin_params_from_summary,
     formalin_histamine,
+    formalin_summary_for_tissue,
     resolve_formalin_params,
     resolve_formalin_params_from_model_config,
 )
@@ -20,6 +23,21 @@ def test_resolve_formalin_defaults_match_factory() -> None:
     a = default_formalin_params()
     b = resolve_formalin_params()
     assert a == b
+
+
+@pytest.mark.parametrize("tissue", [Tissue.SKIN, Tissue.CNS, Tissue.GANGLIA])
+def test_derived_formalin_profile_matches_reported_summary_peaks(tissue: Tissue) -> None:
+    summary = formalin_summary_for_tissue(tissue)
+    params = derive_formalin_params_from_summary(tissue)
+    t = np.linspace(0.0, 12.0, 40_001)
+    y = np.asarray(formalin_histamine(t, params), dtype=float)
+
+    first_peak = float(y[t < params.phase2.t0_h].max())
+    second_peak = float(y[t >= params.phase2.t0_h].max())
+
+    assert params.h_base_nm == summary.h_base_nm
+    assert np.isclose(first_peak, summary.h_peak_i_nm, atol=1e-3)
+    assert np.isclose(second_peak, summary.h_peak_ii_nm, atol=1e-3)
 
 
 def test_resolve_formalin_override_h_base_and_no_least_squares(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -57,22 +57,24 @@ def normalize_units(config: ModelConfig) -> ModelConfig:
     dumped["time_grid"] = [_convert_time_to_h(value=t, unit=time_unit) for t in config.time_grid]
     dumped["time_unit"] = TimeUnit.H
 
-    conc_unit = config.concentration_unit
-    dumped["initial_concentration"] = _convert_concentration_to_nM(
-        value=config.initial_concentration,
-        unit=conc_unit,
-    )
-    dumped["concentration_unit"] = ConcentrationUnit.NM
+    if config.initial_concentration is not None and config.concentration_unit is not None:
+        conc_unit = config.concentration_unit
+        dumped["initial_concentration"] = _convert_concentration_to_nM(
+            value=config.initial_concentration,
+            unit=conc_unit,
+        )
+        dumped["concentration_unit"] = ConcentrationUnit.NM
 
-    dumped["kinetics"]["k_abs"] = _convert_rate_to_per_h(
-        value=config.kinetics.k_abs,
-        unit=config.kinetics.rate_unit,
-    )
-    dumped["kinetics"]["k_elim"] = _convert_rate_to_per_h(
-        value=config.kinetics.k_elim,
-        unit=config.kinetics.rate_unit,
-    )
-    dumped["kinetics"]["rate_unit"] = RateUnit.PER_H
+    if config.kinetics is not None:
+        dumped["kinetics"]["k_abs"] = _convert_rate_to_per_h(
+            value=config.kinetics.k_abs,
+            unit=config.kinetics.rate_unit,
+        )
+        dumped["kinetics"]["k_elim"] = _convert_rate_to_per_h(
+            value=config.kinetics.k_elim,
+            unit=config.kinetics.rate_unit,
+        )
+        dumped["kinetics"]["rate_unit"] = RateUnit.PER_H
 
     for plot in dumped["plots"]:
         plot_x_unit = TimeUnit(plot["x_unit"])

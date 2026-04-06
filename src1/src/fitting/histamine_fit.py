@@ -11,7 +11,8 @@ import pandas as pd
 import scipy
 from scipy.optimize import least_squares
 
-from src.fitting.fit_spec import FitSpec, fit_spec_to_dict
+from src.fitting.fit_spec import FitSpec, fit_spec_to_dict, scipy_least_squares_loss
+from src.utils.atomic_io import write_text_atomic
 
 
 def _set_nested_value(root: dict[str, Any], dotted_name: str, value: float) -> None:
@@ -28,13 +29,11 @@ def _set_nested_value(root: dict[str, Any], dotted_name: str, value: float) -> N
     cursor[keys[-1]] = float(value)
 
 
-
 def _independent_constraints_count(marker_df: pd.DataFrame) -> int:
     t = marker_df["t_h"].to_numpy(dtype=float)
     y = marker_df["histamine_nm"].to_numpy(dtype=float)
     valid = np.isfinite(t) & np.isfinite(y)
     return int(np.unique(t[valid]).size)
-
 
 
 def _params_template(default_params: Any) -> dict[str, Any]:
@@ -43,7 +42,6 @@ def _params_template(default_params: Any) -> dict[str, Any]:
     if isinstance(default_params, Mapping):
         return dict(default_params)
     raise TypeError("default_params must be a dataclass or mapping")
-
 
 
 def fit_histamine_to_markers(
@@ -60,7 +58,7 @@ def fit_histamine_to_markers(
 
     warnings.warn(
         "fit_histamine_to_markers is legacy; prefer fixed parameters (parameter_resolution=fixed_params_only "
-        "and formalin_profile / trafficking overrides in ModelConfig).",
+        "and histamine_profile / formalin_profile / trafficking overrides in ModelConfig).",
         DeprecationWarning,
         stacklevel=2,
     )

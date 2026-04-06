@@ -1,0 +1,8 @@
+{"timestamp_utc": "2026-04-06T00:08:21.538843+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_started"}
+{"timestamp_utc": "2026-04-06T00:08:22.328795+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_completed"}
+{"timestamp_utc": "2026-04-06T00:13:48.476489+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_started"}
+{"timestamp_utc": "2026-04-06T00:13:49.204868+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_completed"}
+{"timestamp_utc": "2026-04-06T00:17:23.522940+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_started"}
+{"timestamp_utc": "2026-04-06T00:17:24.135880+00:00", "level": "ERROR", "logger": "pkpd.run", "message": "simulation_failed"}
+{"timestamp_utc": "2026-04-06T00:19:29.280096+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_started"}
+{"timestamp_utc": "2026-04-06T00:19:29.966015+00:00", "level": "INFO", "logger": "pkpd.run", "message": "simulation_completed"}

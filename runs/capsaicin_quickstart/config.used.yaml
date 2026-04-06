@@ -2,25 +2,111 @@ model_id: capsaicin_pkpd_v1
 compound: capsaicin
 loss_mode: huber
 assumptions:
-- one_compartment_absorption_model
-- first_order_elimination
+- docx_profile_driven_histamine_model
+- capsaicin_monophasic_histamine_release
 traceability:
-  source_in_report: Capsaicin pilot in-vivo study, report table 2
-  source_reference: doi:10.0000/example-capsaicin
-  source_version: 2026-01
+  source_in_report: 'DOCX v12, Модель 1: Динамика концентрации гистамина'
+  source_reference: ДИНАМИКА_ГИСТАМИНА_И_ФАРМАКОДИНАМИКА_H3-РЕЦЕПТОРОВ_v12.docx
+  source_version: v12
 time_grid:
 - 0.0
+- 0.08333333333333333
+- 0.16666666666666666
+- 0.25
+- 0.3333333333333333
+- 0.4166666666666667
 - 0.5
+- 0.5833333333333334
+- 0.6666666666666666
+- 0.75
+- 0.8333333333333334
+- 0.9166666666666666
 - 1.0
+- 1.0833333333333333
+- 1.1666666666666667
+- 1.25
+- 1.3333333333333333
+- 1.4166666666666667
+- 1.5
+- 1.5833333333333333
+- 1.6666666666666667
+- 1.75
+- 1.8333333333333333
+- 1.9166666666666667
 - 2.0
+- 2.0833333333333335
+- 2.1666666666666665
+- 2.25
+- 2.3333333333333335
+- 2.4166666666666665
+- 2.5
+- 2.5833333333333335
+- 2.6666666666666665
+- 2.75
+- 2.8333333333333335
+- 2.9166666666666665
+- 3.0
+- 3.0833333333333335
+- 3.1666666666666665
+- 3.25
+- 3.3333333333333335
+- 3.4166666666666665
+- 3.5
+- 3.5833333333333335
+- 3.6666666666666665
+- 3.75
+- 3.8333333333333335
+- 3.9166666666666665
 - 4.0
+- 4.083333333333333
+- 4.166666666666667
+- 4.25
+- 4.333333333333333
+- 4.416666666666667
+- 4.5
+- 4.583333333333333
+- 4.666666666666667
+- 4.75
+- 4.833333333333333
+- 4.916666666666667
+- 5.0
+- 5.083333333333333
+- 5.166666666666667
+- 5.25
+- 5.333333333333333
+- 5.416666666666667
+- 5.5
+- 5.583333333333333
+- 5.666666666666667
+- 5.75
+- 5.833333333333333
+- 5.916666666666667
+- 6.0
+- 6.083333333333333
+- 6.166666666666667
+- 6.25
+- 6.333333333333333
+- 6.416666666666667
+- 6.5
+- 6.583333333333333
+- 6.666666666666667
+- 6.75
+- 6.833333333333333
+- 6.916666666666667
+- 7.0
+- 7.083333333333333
+- 7.166666666666667
+- 7.25
+- 7.333333333333333
+- 7.416666666666667
+- 7.5
+- 7.583333333333333
+- 7.666666666666667
+- 7.75
+- 7.833333333333333
+- 7.916666666666667
+- 8.0
 time_unit: h
-initial_concentration: 250.0
-concentration_unit: nM
-kinetics:
-  k_abs: 4.8
-  k_elim: 0.8999999999999999
-  rate_unit: 1/h
 tissues:
 - name: plasma
   volume: 2.5
@@ -32,11 +118,30 @@ tissues:
   partition_coeff: 3.6
 plots:
 - id: plasma_curve
-  title: Plasma concentration over time
+  title: Histamine concentration over time
   plot_type: line
   x: time
-  y: plasma_concentration
+  y: histamine_concentration
   x_unit: h
   y_unit: nM
+parameter_resolution: fixed_params_only
+histamine_profile:
+  profile_id: capsaicin
+  tissue: skin
+  h_base_nm: 50.0
+  phase1:
+    amplitude_nm: 150.0
+    t0_h: 0.0
+    tau_rise_h: 0.16666666666666666
+    tau_fall_h: 0.6666666666666666
+trafficking:
+  k_int_max: 2.5
+  k_rec: 0.5
+  k_synth: 0.05
+  ec50_barr_nm: 1500.0
+  hill_n: 1.0
+  ec50_g_nm: 50.0
+plot_proxy:
+  g_signal_ec50_nm: 50.0
 scenario_assumptions:
   clip_state_explicit: false

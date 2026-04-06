@@ -92,24 +92,28 @@ def render_gsignaling(
     out_path: str | Path,
     annotations: PlotAnnotationOptions | None = None,
 ) -> PlotRenderResult:
-    """Render a normalized G-signaling proxy derived from histamine and receptor availability."""
+    """Render G-signaling from simulation output or a legacy proxy fallback."""
 
     opts = annotations or PlotAnnotationOptions()
-    ec50_nm = float(opts.ec50_nm) if opts.ec50_nm is not None else 100.0
-
-    data = timeseries.loc[:, ["time_h", "histamine_nm", "R_surf"]].copy()
-    data["G_signal"] = (data["R_surf"] * data["histamine_nm"]) / (ec50_nm + data["histamine_nm"])
+    if "G_signal" in timeseries.columns:
+        data = timeseries.loc[:, ["time_h", "G_signal"]].copy()
+        ylabel = "Activity (%)"
+    else:
+        ec50_nm = float(opts.ec50_nm) if opts.ec50_nm is not None else 100.0
+        data = timeseries.loc[:, ["time_h", "histamine_nm", "R_surf"]].copy()
+        data["G_signal"] = (data["R_surf"] * data["histamine_nm"]) / (ec50_nm + data["histamine_nm"])
+        ylabel = "Activity (a.u.)"
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(data["time_h"], data["G_signal"], label="G_signal", color="#ff7f0e")
-    ax.set_title("G-signaling (proxy)")
+    ax.set_title("G-signaling")
     ax.set_xlabel("Time (h)")
-    ax.set_ylabel("Activity (a.u.)")
+    ax.set_ylabel(ylabel)
 
     if opts.phase_markers_h:
         _draw_phase_markers(ax, opts.phase_markers_h)
 
-    if opts.ec50_nm is not None:
+    if opts.ec50_nm is not None and "R_surf" in data.columns:
         ax.axhline(0.5 * data["R_surf"].max(), color="#d62728", linestyle=":", linewidth=1.0, label="EC50 guide")
 
     ax.legend()

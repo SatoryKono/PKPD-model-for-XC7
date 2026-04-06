@@ -9,6 +9,7 @@
   - `trafficking`: optional H3R trafficking parameters; omitted block keeps previous built-in defaults.
   - `plot_proxy.g_signal_ec50_nm`: optional override for G_signal plots; if omitted, G proxy uses `trafficking.ec50_g_nm`.
   - `formalin_profile`: whitelist overrides for fixed formalin histamine parameters (`resolve_formalin_params`).
+  - `histamine_profile`: explicit deterministic profile-driven Model 1 input (`profile_id`, `tissue`, `h_base_nm`, `phase1`, `phase2`) for DOCX-style histamine kinetics across capsaicin/formalin/compound48_80/hotplate/acetic_writhing/carrageenin.
 - **Metadata**: `metadata.json` and sidecar `meta.yaml` include `parameter_source` (`defaults` | `overrides`) and `optimization_applied` (bool).
 - **Legacy fit**: `FitSpec.loss_mode` is passed to `scipy.optimize.least_squares(loss=...)` for `mse` / `huber` / `mae`; `nll` raises with a clear error.
 - **I/O**: CSV/JSON/YAML writes for runs, exports, and legacy fit reports use temp-then-`os.replace`.
@@ -19,6 +20,7 @@
 
 - **CLI**: new `fit` / `fit-legacy` commands exit with code 2 and migration text; interactive optimization is not supported on the CLI.
 - **Deprecation**: `fit_histamine_to_markers` emits `DeprecationWarning`; use fixed parameters via config.
+- **Migration**: `histamine_profile` is now the preferred way to express Model 1 kinetics from DOCX. Legacy `initial_concentration` + `kinetics` Bateman input remains supported for backward compatibility.
 
 ### Tests / CI
 

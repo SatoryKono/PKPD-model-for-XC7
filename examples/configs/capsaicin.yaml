@@ -1,26 +1,28 @@
 # Expected marker_points.csv (first 3 lines):
-# time_h,plasma_concentration_nM,marker
-# 0.0,250.0,baseline
-# 1.0,210.5,peak_decline
+# time_h,histamine_nm,marker
+# 0.0,50.0,baseline
+# 0.25,>50.0,rising_phase
 
 model_id: capsaicin_pkpd_v1
 compound: capsaicin
 loss_mode: huber
 assumptions:
-  - one_compartment_absorption_model
-  - first_order_elimination
+  - docx_profile_driven_histamine_model
+  - capsaicin_monophasic_histamine_release
 traceability:
-  source_in_report: "Capsaicin pilot in-vivo study, report table 2"
-  source_reference: "doi:10.0000/example-capsaicin"
-  source_version: "2026-01"
-time_grid: [0, 30, 60, 120, 240]
+  source_in_report: "DOCX v12, Модель 1: Динамика концентрации гистамина"
+  source_reference: "ДИНАМИКА_ГИСТАМИНА_И_ФАРМАКОДИНАМИКА_H3-РЕЦЕПТОРОВ_v12.docx"
+  source_version: "v12"
+# 5 min to 8 h (97 points): 0, 5, …, 480 min
+time_grid:
+  [
+    0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120,
+    125, 130, 135, 140, 145, 150, 155, 160, 165, 170, 175, 180, 185, 190, 195, 200, 205, 210, 215, 220, 225,
+    230, 235, 240, 245, 250, 255, 260, 265, 270, 275, 280, 285, 290, 295, 300, 305, 310, 315, 320, 325, 330,
+    335, 340, 345, 350, 355, 360, 365, 370, 375, 380, 385, 390, 395, 400, 405, 410, 415, 420, 425, 430, 435,
+    440, 445, 450, 455, 460, 465, 470, 475, 480,
+  ]
 time_unit: min
-initial_concentration: 0.25
-concentration_unit: uM
-kinetics:
-  k_abs: 0.08
-  k_elim: 0.015
-  rate_unit: 1/min
 tissues:
   - name: plasma
     volume: 2.5
@@ -32,11 +34,29 @@ tissues:
     partition_coeff: 3.6
 plots:
   - id: plasma_curve
-    title: Plasma concentration over time
+    title: Histamine concentration over time
     plot_type: line
     x: time
-    y: plasma_concentration
+    y: histamine_concentration
     x_unit: min
-    y_unit: uM
+    y_unit: nM
+histamine_profile:
+  profile_id: capsaicin
+  tissue: skin
+  h_base_nm: 50.0
+  phase1:
+    amplitude_nm: 150.0
+    t0_h: 0.0
+    tau_rise_h: 0.16666666666666666
+    tau_fall_h: 0.6666666666666666
+trafficking:
+  k_int_max: 2.5
+  k_rec: 0.5
+  k_synth: 0.05
+  ec50_barr_nm: 1500.0
+  hill_n: 1.0
+  ec50_g_nm: 50.0
+plot_proxy:
+  g_signal_ec50_nm: 50.0
 scenario_assumptions:
   clip_state_explicit: false

@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 
-from src.config.schemas import ModelConfig, RateUnit, TraffickingConfig
+from src.config.schemas import HistaminePhaseOverrides, ModelConfig, RateUnit, TraffickingConfig
+from src.histamine_profiles import (
+    HistamineProfileParams,
+    PulsePhase,
+    Tissue,
+    get_histamine_profile,
+    resolve_formalin_params_from_model_config,
+)
 
 
 @dataclass(frozen=True)
@@ -49,31 +56,121 @@ class ModelParams:
     """Runtime parameters that directly affect receptor RHS/input profile."""
 
     trafficking: TraffickingParams
-    initial_concentration_nm: float
-    k_abs_per_h: float
-    k_elim_per_h: float
+    histamine_input_fn: Callable[[float], float]
+    histamine_source: str
+    histamine_profile: HistamineProfileParams | None
+    initial_concentration_nm: float | None
+    k_abs_per_h: float | None
+    k_elim_per_h: float | None
     tissues: TissueModelParams
     clip_state_explicit: bool
+
+
+def _merge_histamine_phase(
+    phase: PulsePhase,
+    overrides: HistaminePhaseOverrides | None,
+) -> PulsePhase:
+    if overrides is None:
+        return phase
+    return PulsePhase(
+        amplitude_nm=float(overrides.amplitude_nm)
+        if overrides.amplitude_nm is not None
+        else phase.amplitude_nm,
+        t0_h=float(overrides.t0_h) if overrides.t0_h is not None else phase.t0_h,
+        tau_rise_h=float(overrides.tau_rise_h)
+        if overrides.tau_rise_h is not None
+        else phase.tau_rise_h,
+        tau_fall_h=float(overrides.tau_fall_h)
+        if overrides.tau_fall_h is not None
+        else phase.tau_fall_h,
+    )
+
+
+def _resolve_profile_from_config(cfg: ModelConfig) -> tuple[str, HistamineProfileParams] | None:
+    if cfg.histamine_profile is not None:
+        profile_cfg = cfg.histamine_profile
+        if profile_cfg.profile_id.value == "pk_bateman":
+            if any(
+                value is not None for value in (profile_cfg.h_base_nm, profile_cfg.phase1, profile_cfg.phase2)
+            ):
+                raise ValueError("histamine_profile.profile_id='pk_bateman' cannot define phase overrides.")
+            return None
+
+        _, default_profile = get_histamine_profile(
+            profile_cfg.profile_id.value,
+            tissue=profile_cfg.tissue.value,
+        )
+        phase1 = _merge_histamine_phase(default_profile.phase1, profile_cfg.phase1)
+
+        if default_profile.phase2 is None:
+            if profile_cfg.phase2 is not None:
+                raise ValueError(
+                    f"profile '{profile_cfg.profile_id.value}' does not define phase2; override is invalid."
+                )
+            phase2 = None
+        else:
+            phase2 = _merge_histamine_phase(default_profile.phase2, profile_cfg.phase2)
+
+        resolved = HistamineProfileParams(
+            profile_type=default_profile.profile_type,
+            tissue=default_profile.tissue,
+            h_base_nm=float(profile_cfg.h_base_nm)
+            if profile_cfg.h_base_nm is not None
+            else default_profile.h_base_nm,
+            phase1=phase1,
+            phase2=phase2,
+        )
+        return (profile_cfg.profile_id.value, resolved)
+
+    if cfg.formalin_profile is not None:
+        return (
+            "formalin",
+            resolve_formalin_params_from_model_config(cfg, tissue=Tissue.SKIN),
+        )
+
+    return None
+
+
+def _bateman_histamine_input_profile(
+    t_h: float,
+    *,
+    initial_concentration_nm: float,
+    k_abs_per_h: float,
+    k_elim_per_h: float,
+    tissues: TissueModelParams,
+) -> float:
+    if t_h < 0:
+        raise ValueError("t_h must be >= 0")
+
+    dose_nmol = initial_concentration_nm * tissues.effective_volume_l
+    distribution_volume_l = tissues.partition_weighted_volume_l
+    scale = dose_nmol / distribution_volume_l
+
+    delta = k_abs_per_h - k_elim_per_h
+    if abs(delta) < 1e-12:
+        concentration_nm = scale * k_abs_per_h * t_h * np.exp(-k_elim_per_h * t_h)
+    else:
+        concentration_nm = (
+            scale
+            * (k_abs_per_h / delta)
+            * (np.exp(-k_elim_per_h * t_h) - np.exp(-k_abs_per_h * t_h))
+        )
+
+    return float(max(concentration_nm, 0.0))
 
 
 def build_model_params(cfg: ModelConfig) -> ModelParams:
     """Build validated model parameters from ``ModelConfig``.
 
     Contract (fields that affect RHS/input profile):
-    - ``initial_concentration``: concentration-scale for histamine input profile.
-    - ``kinetics.k_abs`` and ``kinetics.k_elim``: first-order absorption/elimination in 1/h.
+    - ``histamine_profile``: explicit DOCX-like histamine driver (preferred).
+    - legacy path: ``initial_concentration`` + ``kinetics.k_abs`` + ``kinetics.k_elim``.
     - ``tissues[*].volume`` and ``tissues[*].partition_coeff``: collapsed into effective
       distribution volume for the concentration profile.
     - ``scenario_assumptions.clip_state_explicit`` (optional bool): explicit RHS clipping mode.
 
     Unsupported scenario-assumption keys raise ``ValueError`` to avoid silent ignores.
     """
-
-    if cfg.kinetics.rate_unit != RateUnit.PER_H:
-        raise ValueError(
-            "Model requires kinetics.rate_unit='1/h'. "
-            "Use normalized config (load_config(..., normalize=True))."
-        )
 
     if any(tissue.volume_unit.strip().lower() != "l" for tissue in cfg.tissues):
         raise ValueError(
@@ -100,41 +197,70 @@ def build_model_params(cfg: ModelConfig) -> ModelParams:
     if not isinstance(clip_state_explicit_raw, bool):
         raise ValueError("scenario_assumptions.clip_state_explicit must be a boolean.")
 
+    profile_resolution = _resolve_profile_from_config(cfg)
+    histamine_source: str
+    histamine_profile: HistamineProfileParams | None
+    initial_concentration_nm: float | None
+    k_abs_per_h: float | None
+    k_elim_per_h: float | None
+
+    tissue_params = TissueModelParams(
+        effective_volume_l=effective_volume_l,
+        partition_weighted_volume_l=partition_weighted_volume_l,
+    )
+
+    if profile_resolution is not None:
+        histamine_source, histamine_profile = profile_resolution
+        profile_fn, _ = get_histamine_profile(
+            histamine_source,
+            tissue=histamine_profile.tissue.value,
+        )
+        histamine_input_fn = lambda t_h: float(profile_fn(t_h, histamine_profile))
+        initial_concentration_nm = None
+        k_abs_per_h = None
+        k_elim_per_h = None
+    else:
+        if cfg.kinetics is None or cfg.initial_concentration is None:
+            raise ValueError(
+                "Legacy Bateman input requires initial_concentration and kinetics when no histamine_profile is set."
+            )
+        if cfg.kinetics.rate_unit != RateUnit.PER_H:
+            raise ValueError(
+                "Model requires kinetics.rate_unit='1/h'. "
+                "Use normalized config (load_config(..., normalize=True))."
+            )
+        histamine_source = "pk_bateman"
+        histamine_profile = None
+        initial_concentration_nm = float(cfg.initial_concentration)
+        k_abs_per_h = float(cfg.kinetics.k_abs)
+        k_elim_per_h = float(cfg.kinetics.k_elim)
+        histamine_input_fn = lambda t_h: _bateman_histamine_input_profile(
+            t_h,
+            initial_concentration_nm=initial_concentration_nm,
+            k_abs_per_h=k_abs_per_h,
+            k_elim_per_h=k_elim_per_h,
+            tissues=tissue_params,
+        )
+
     return ModelParams(
-        trafficking=DEFAULT_PARAMS,
-        initial_concentration_nm=float(cfg.initial_concentration),
-        k_abs_per_h=float(cfg.kinetics.k_abs),
-        k_elim_per_h=float(cfg.kinetics.k_elim),
-        tissues=TissueModelParams(
-            effective_volume_l=effective_volume_l,
-            partition_weighted_volume_l=partition_weighted_volume_l,
-        ),
+        trafficking=_trafficking_params_from_config(cfg.trafficking),
+        histamine_input_fn=histamine_input_fn,
+        histamine_source=histamine_source,
+        histamine_profile=histamine_profile,
+        initial_concentration_nm=initial_concentration_nm,
+        k_abs_per_h=k_abs_per_h,
+        k_elim_per_h=k_elim_per_h,
+        tissues=tissue_params,
         clip_state_explicit=clip_state_explicit_raw,
     )
 
 
 def histamine_input_profile(t_h: float, params: ModelParams) -> float:
-    """Oral one-compartment concentration profile used as receptor driver."""
+    """Return deterministic histamine driver concentration (legacy PK or explicit profile)."""
 
     if t_h < 0:
         raise ValueError("t_h must be >= 0")
-
-    dose_nmol = params.initial_concentration_nm * params.tissues.effective_volume_l
-    distribution_volume_l = params.tissues.partition_weighted_volume_l
-    scale = dose_nmol / distribution_volume_l
-
-    delta = params.k_abs_per_h - params.k_elim_per_h
-    if abs(delta) < 1e-12:
-        # Stable limit of Bateman function for k_abs -> k_elim.
-        concentration_nm = scale * params.k_abs_per_h * t_h * np.exp(-params.k_elim_per_h * t_h)
-    else:
-        concentration_nm = (
-            scale
-            * (params.k_abs_per_h / delta)
-            * (np.exp(-params.k_elim_per_h * t_h) - np.exp(-params.k_abs_per_h * t_h))
-        )
-
-    return float(max(concentration_nm, 0.0))
+    return float(params.histamine_input_fn(t_h))
 
 
 def _register_assumption(assumptions: list[str] | None, message: str) -> None:

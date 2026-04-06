@@ -10,7 +10,9 @@ import yaml
 
 from src.config.loader import load_config as _load_config
 from src.config.loader import normalize_units
-from src.config.schemas import ModelConfig, ParameterResolutionMode
+from src.config.schemas import ModelConfig, ParameterResolutionMode, effective_g_signal_ec50_nm
+from src.histamine_profiles import Tissue
+from src.models.g_signaling import default_g_signal_params_for_tissue, g_signal_percent
 from src.models.receptor_trafficking import (
     build_model_params,
     histamine_input_profile,
@@ -55,7 +57,7 @@ def ensure_canonical_config(cfg: ModelConfig) -> ModelConfig:
 
 
 def _infer_parameter_source(cfg: ModelConfig) -> str:
-    if cfg.formalin_profile is not None or cfg.trafficking is not None:
+    if cfg.histamine_profile is not None or cfg.formalin_profile is not None or cfg.trafficking is not None:
         return "overrides"
     if cfg.plot_proxy is not None and cfg.plot_proxy.g_signal_ec50_nm is not None:
         return "overrides"
@@ -67,20 +69,46 @@ def _optimization_applied_from_config(cfg: ModelConfig) -> bool:
 
 
 def _save_used_config(config: ModelConfig, path: Path) -> None:
-    payload = config.model_dump(mode="json")
+    payload = config.model_dump(mode="json", exclude_none=True)
     write_text_atomic(path, yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
 
-def _build_summary(frame: pd.DataFrame, cfg: ModelConfig) -> pd.DataFrame:
+def _resolve_g_signal_tissue(cfg: ModelConfig, model_params) -> Tissue:
+    if model_params.histamine_profile is not None:
+        return model_params.histamine_profile.tissue
+    if cfg.histamine_profile is not None:
+        return Tissue(cfg.histamine_profile.tissue.value)
+    if cfg.formalin_profile is not None:
+        return Tissue.SKIN
+    return Tissue.SKIN
+
+
+def _build_summary(frame: pd.DataFrame, cfg: ModelConfig, *, g_signal_tissue: Tissue) -> pd.DataFrame:
     auc = float(np.trapezoid(frame["histamine_nm"].to_numpy(), frame["time_h"].to_numpy()))
+    k_abs_used = float(cfg.kinetics.k_abs) if cfg.kinetics is not None else float("nan")
+    k_elim_used = float(cfg.kinetics.k_elim) if cfg.kinetics is not None else float("nan")
+    g_signal_auc = float(np.trapezoid(frame["G_signal"].to_numpy(), frame["time_h"].to_numpy()))
+    g_signal_ec50_nm = effective_g_signal_ec50_nm(cfg, 50.0 if cfg.trafficking is None else cfg.trafficking.ec50_g_nm)
+    g_signal_params = default_g_signal_params_for_tissue(
+        g_signal_tissue,
+        ec50_g_nm=g_signal_ec50_nm,
+        hill_n=1.0 if cfg.trafficking is None else cfg.trafficking.hill_n,
+    )
     return pd.DataFrame(
         [
             {"metric": "rows", "value": float(len(frame))},
             {"metric": "R_surf_max", "value": float(frame["R_surf"].max())},
             {"metric": "R_int_max", "value": float(frame["R_int"].max())},
+            {"metric": "G_signal_max", "value": float(frame["G_signal"].max())},
             {"metric": "histamine_auc_nm_h", "value": auc},
-            {"metric": "k_abs_per_h_used", "value": float(cfg.kinetics.k_abs)},
-            {"metric": "k_elim_per_h_used", "value": float(cfg.kinetics.k_elim)},
+            {"metric": "g_signal_auc_pct_h", "value": g_signal_auc},
+            {"metric": "k_abs_per_h_used", "value": k_abs_used},
+            {"metric": "k_elim_per_h_used", "value": k_elim_used},
+            {"metric": "g_signal_ec50_nm_used", "value": float(g_signal_ec50_nm)},
+            {
+                "metric": "g_signal_constitutive_activity_pct_used",
+                "value": float(g_signal_params.constitutive_activity_fraction * 100.0),
+            },
             {
                 "metric": "tissue_partition_weighted_volume_l_used",
                 "value": float(sum(t.volume * t.partition_coeff for t in cfg.tissues)),
@@ -114,19 +142,37 @@ def run_simulation(cfg: ModelConfig) -> SimulationResult:
     if not result.success:
         raise RuntimeError(f"Simulation failed: {result.message}")
 
+    histamine_series = np.asarray([histamine_input_profile(t, model_params) for t in result.t], dtype=float)
+    g_signal_tissue = _resolve_g_signal_tissue(cfg, model_params)
+    g_signal_ec50_nm = effective_g_signal_ec50_nm(cfg, model_params.trafficking.ec50_g_nm)
+    g_signal_params = default_g_signal_params_for_tissue(
+        g_signal_tissue,
+        ec50_g_nm=g_signal_ec50_nm,
+        hill_n=model_params.trafficking.hill_n,
+    )
+    g_signal_series = np.asarray(
+        g_signal_percent(
+            histamine_nm=histamine_series,
+            r_surf=result.y[0],
+            params=g_signal_params,
+        ),
+        dtype=float,
+    )
+
     frame = pd.DataFrame(
         {
             "time_h": result.t,
             "R_surf": result.y[0],
             "R_int": result.y[1],
-            "histamine_nm": [histamine_input_profile(t, model_params) for t in result.t],
-            "k_abs_per_h": model_params.k_abs_per_h,
-            "k_elim_per_h": model_params.k_elim_per_h,
+            "histamine_nm": histamine_series,
+            "G_signal": g_signal_series,
+            "k_abs_per_h": model_params.k_abs_per_h if model_params.k_abs_per_h is not None else np.nan,
+            "k_elim_per_h": model_params.k_elim_per_h if model_params.k_elim_per_h is not None else np.nan,
             "tissue_partition_weighted_volume_l": model_params.tissues.partition_weighted_volume_l,
         }
     )
 
-    run_tables = build_run_tables(timeseries=frame, summary=_build_summary(frame, cfg))
+    run_tables = build_run_tables(timeseries=frame, summary=_build_summary(frame, cfg, g_signal_tissue=g_signal_tissue))
     return SimulationResult(
         config=cfg,
         timeseries=run_tables.timeseries,

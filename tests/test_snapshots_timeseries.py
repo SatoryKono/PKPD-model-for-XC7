@@ -7,6 +7,8 @@ pytest.importorskip("pytest_regtest", reason="optional dependency for snapshot t
 from src.validation.compare import apply_rounding_spec
 from src.validation.rounding_spec import RoundingSpec
 
+pytestmark = pytest.mark.snapshot
+
 
 def test_timeseries_snapshot_after_rounding(regtest) -> None:  # type: ignore[no-untyped-def]
     times = np.linspace(0.0, 2.0, 5)

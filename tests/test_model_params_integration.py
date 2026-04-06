@@ -69,9 +69,12 @@ def test_kinetics_and_tissue_changes_impact_summary_metrics(tmp_path: Path) -> N
     auc_variant = _summary_metric(run_variant / "summary.csv", "histamine_auc_nm_h")
     r_int_max_base = _summary_metric(run_base / "summary.csv", "R_int_max")
     r_int_max_variant = _summary_metric(run_variant / "summary.csv", "R_int_max")
+    g_signal_auc_base = _summary_metric(run_base / "summary.csv", "g_signal_auc_pct_h")
+    g_signal_auc_variant = _summary_metric(run_variant / "summary.csv", "g_signal_auc_pct_h")
 
     assert auc_variant != auc_base
     assert r_int_max_variant != r_int_max_base
+    assert g_signal_auc_variant != g_signal_auc_base
 
 
 def test_unsupported_scenario_assumptions_fail_explicitly(tmp_path: Path) -> None:
