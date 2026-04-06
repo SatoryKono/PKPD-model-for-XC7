@@ -42,8 +42,8 @@ def add_g_signal_columns(
         xc7 = result[ANTAGONIST_CONCENTRATION_COL].fillna(0.0).to_numpy(dtype=float)
     else:
         xc7 = pd.Series([0.0] * len(result.index), index=result.index, dtype=float).to_numpy(dtype=float)
-    g_signal_total = g_signaling_fraction(histamine, r_surf, params)
-    g_signal_ligand = agonist_g_signal_fraction(histamine, r_surf, params)
+    g_signal_total = g_signaling_fraction(histamine, r_surf, params, xc7_nm=xc7)
+    g_signal_ligand = agonist_g_signal_fraction(histamine, r_surf, params, xc7_nm=xc7)
     g_signal_constitutive = constitutive_signal_fraction(r_surf, params)
     beta_arr_signal = [beta_arr_fraction(float(h), params, xc7_nm=float(c)) for h, c in zip(histamine, xc7, strict=False)]
     int_drive = [

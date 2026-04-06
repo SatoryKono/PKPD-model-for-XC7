@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pkpd_xc7.models.h3_signaling import g_signaling_fraction
+from pkpd_xc7.models.h3_signaling import agonist_g_signal_fraction, beta_arr_fraction, g_signaling_fraction
 from pkpd_xc7.models.receptor_trafficking import (
     TraffickingCoreParams,
     internalization_drive,
@@ -88,6 +88,64 @@ def test_g_signaling_formula() -> None:
     )
     assert g_signaling_fraction(0.0, 1.0, params) == pytest.approx(0.0)
     assert np.isclose(g_signaling_fraction(50.0, 0.8, params), 0.4)
+
+
+def test_g_no_antagonist(default_params: TraffickingCoreParams) -> None:
+    histamine_nm = 50.0
+    r_surf = 0.8
+    legacy_agonist = agonist_g_signal_fraction(histamine_nm, r_surf, default_params)
+    legacy_total = g_signaling_fraction(histamine_nm, r_surf, default_params)
+
+    assert agonist_g_signal_fraction(histamine_nm, r_surf, default_params, xc7_nm=0.0) == pytest.approx(legacy_agonist)
+    assert g_signaling_fraction(histamine_nm, r_surf, default_params, xc7_nm=0.0) == pytest.approx(legacy_total)
+
+
+def test_g_full_block(default_params: TraffickingCoreParams) -> None:
+    histamine_nm = 50.0
+    r_surf = 1.0
+    xc7_nm = 1e300
+
+    agonist_fraction = agonist_g_signal_fraction(histamine_nm, r_surf, default_params, xc7_nm=xc7_nm)
+    total_fraction = g_signaling_fraction(histamine_nm, r_surf, default_params, xc7_nm=xc7_nm)
+
+    assert np.isfinite(agonist_fraction)
+    assert np.isfinite(total_fraction)
+    assert agonist_fraction == pytest.approx(0.0, abs=1e-12)
+    assert total_fraction == pytest.approx(0.0, abs=1e-12)
+
+
+def test_g_monotonic(default_params: TraffickingCoreParams) -> None:
+    histamine_nm = 50.0
+    r_surf = 0.9
+    xc7_grid = (0.0, 10.0, 100.0, 1_000.0)
+
+    agonist_values = [
+        agonist_g_signal_fraction(histamine_nm, r_surf, default_params, xc7_nm=xc7_nm) for xc7_nm in xc7_grid
+    ]
+    total_values = [g_signaling_fraction(histamine_nm, r_surf, default_params, xc7_nm=xc7_nm) for xc7_nm in xc7_grid]
+
+    assert agonist_values == sorted(agonist_values, reverse=True)
+    assert total_values == sorted(total_values, reverse=True)
+
+
+def test_g_vs_arr_bias() -> None:
+    params = TraffickingCoreParams(
+        k_int_max_per_h=3.0,
+        k_rec_per_h=0.5,
+        k_synth_per_h=0.05,
+        ec50_barr_nm=50.0,
+        ec50_internalization_nm=50.0,
+        kb_arr_nm=10.0,
+        hill_n=1.0,
+        ec50_g_nm=50.0,
+        kb_g_nm=1_000.0,
+        constitutive_activity=0.0,
+    )
+
+    g_fraction = agonist_g_signal_fraction(50.0, 1.0, params, xc7_nm=100.0)
+    beta_arr = beta_arr_fraction(50.0, params, xc7_nm=100.0)
+
+    assert g_fraction > beta_arr
 
 
 def test_xc7_zero_preserves_legacy_internalization(default_params: TraffickingCoreParams) -> None:

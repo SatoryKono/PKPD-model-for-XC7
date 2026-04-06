@@ -14,7 +14,13 @@ from pkpd_xc7.io.layout import (
     TIMESERIES_COLUMN_ORDER,
     enforce_timeseries_layout,
 )
-from pkpd_xc7.models.h3_signaling import beta_arr_fraction, g_signal_percent, g_signaling_fraction
+from pkpd_xc7.models.h3_signaling import (
+    agonist_g_signal_fraction,
+    beta_arr_fraction,
+    constitutive_signal_fraction,
+    g_signal_percent,
+    g_signaling_fraction,
+)
 from pkpd_xc7.models.receptor_trafficking import (
     MODEL_RUNTIME_ASSUMPTION,
     analytic_steady_state_fractions,
@@ -227,7 +233,53 @@ def test_add_g_signal_columns_adds_report_space_columns_once() -> None:
     assert np.all((g_ligand_pct >= 0.0) & (g_ligand_pct <= 100.0))
     assert np.all((g_constitutive_pct >= 0.0) & (g_constitutive_pct <= 100.0))
     assert np.all((beta_arr_pct >= 0.0) & (beta_arr_pct <= 100.0))
-    assert result.loc[1, "internalization_drive"] < internalization_drive(50.0, params)
+    assert float(result.loc[1, "internalization_drive"]) < internalization_drive(50.0, params)
+
+
+def test_add_g_signal_columns_applies_xc7_to_g_pathway_only_via_ligand_component() -> None:
+    cfg = ModelConfig.model_validate(
+        _payload(
+            trafficking={
+                "ec50_barr_nm": 50.0,
+                "ec50_internalization_nm": 50.0,
+                "kb_arr_nm": 10.0,
+                "hill_n": 1.0,
+                "ec50_g_nm": 50.0,
+                "kb_g_nm": 1_000.0,
+                "constitutive_activity": 0.2,
+            }
+        )
+    )
+    params = model_config_to_trafficking_core(cfg)
+    df = pd.DataFrame(
+        {
+            "histamine_nm": [50.0, 50.0],
+            "R_surf": [0.8, 0.8],
+            ANTAGONIST_CONCENTRATION_COL: [0.0, 100.0],
+        }
+    )
+
+    result = add_g_signal_columns(df, params)
+
+    g_signal_control = float(result.loc[0, "G_signal"])
+    g_signal_xc7 = float(result.loc[1, "G_signal"])
+    g_signal_ligand_control = float(result.loc[0, "G_signal_ligand"])
+    g_signal_ligand_xc7 = float(result.loc[1, "G_signal_ligand"])
+    g_signal_constitutive_control = float(result.loc[0, "G_signal_constitutive"])
+    g_signal_constitutive_xc7 = float(result.loc[1, "G_signal_constitutive"])
+    beta_arr_xc7 = float(result.loc[1, "beta_arr_signal"])
+
+    assert g_signal_control == pytest.approx(g_signaling_fraction(50.0, 0.8, params, xc7_nm=0.0))
+    assert g_signal_xc7 == pytest.approx(g_signaling_fraction(50.0, 0.8, params, xc7_nm=100.0))
+    assert g_signal_ligand_control == pytest.approx(agonist_g_signal_fraction(50.0, 0.8, params, xc7_nm=0.0))
+    assert g_signal_ligand_xc7 == pytest.approx(
+        agonist_g_signal_fraction(50.0, 0.8, params, xc7_nm=100.0)
+    )
+    assert g_signal_constitutive_control == pytest.approx(constitutive_signal_fraction(0.8, params))
+    assert g_signal_constitutive_xc7 == pytest.approx(constitutive_signal_fraction(0.8, params))
+    assert g_signal_xc7 < g_signal_control
+    assert g_signal_ligand_xc7 < g_signal_ligand_control
+    assert beta_arr_xc7 < g_signal_ligand_xc7
 
 
 def test_run_experiment_dataframe_keeps_g_signal_percent_in_sync() -> None:

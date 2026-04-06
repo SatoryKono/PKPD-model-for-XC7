@@ -23,7 +23,7 @@ column_order:
 row_count: 1156
 driver_type: scenario
 driver_id: capsaicin
-generated_at_utc: '2026-04-06T18:46:12Z'
+generated_at_utc: '2026-04-06T18:51:11Z'
 default_trafficking_params:
   k_int_max_per_h: 1.25
   k_rec_per_h: 0.5

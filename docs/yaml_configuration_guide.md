@@ -179,9 +179,10 @@ trafficking:
 Важно:
 
 - `kb_arr_nm` задаёт конкурентный сдвиг XC7 для arrestin/internalization pathway.
-- В текущем runtime используется формула `histamine_eff_nm = histamine_nm / (1 + xc7_nm / kb_arr_nm)`.
+- Для arrestin/internalization pathway используется формула `histamine_eff_nm = histamine_nm / (1 + xc7_nm / kb_arr_nm)`.
 - Это влияет на `internalization_drive`, `k_int_eff`, `steady_state_ic`, `receptor_trafficking_rhs`, а также на экспортируемые `beta_arr_signal`, `internalization_drive` и `k_int_eff_per_h`.
-- `kb_g_nm` уже принят схемой и попадает в `meta.yaml`, но пока зарезервирован для будущего расширения G-signaling pathway.
+- `kb_g_nm` задаёт конкурентный сдвиг XC7 для G-signaling pathway по той же равновесной схеме `histamine_eff_nm = histamine_nm / (1 + xc7_nm / kb_g_nm)`.
+- Это влияет на `agonist_g_signal_fraction`, `g_signaling_fraction`, а также на экспортируемые `G_signal` и `G_signal_ligand`.
 - Если `kb_arr_nm` или `kb_g_nm` не заданы явно, runtime детерминированно использует fallback к соответствующему `ec50_barr_nm` или `ec50_g_nm`.
 
 ## 7. Трассируемость и допущения
