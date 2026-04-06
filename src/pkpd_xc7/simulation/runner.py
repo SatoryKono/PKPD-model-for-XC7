@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 import pandas as pd
 
@@ -99,16 +101,32 @@ def run_experiment(config: ModelConfig) -> pd.DataFrame:
     for tissue in config.tissues:
         params = model_config_to_trafficking_core(config, tissue=tissue)
         h_grid = np.array([resolve_histamine_nm(float(t), config, tissue) for t in time_grid])
+        xc7_at_time_nm: Callable[[float], float]
         if antagonist_pk_runtime is None:
+            def xc7_at_time_nm(t_h: float) -> float:
+                del t_h
+                return 0.0
+
             antagonist_grid = np.full_like(time_grid, np.nan, dtype=float)
         else:
+            def xc7_at_time_nm(t_h: float, *, _tissue: str = tissue) -> float:
+                return float(antagonist_pk_runtime.concentration_nm(_tissue, float(t_h)))
+
             antagonist_grid = np.array(
-                [antagonist_pk_runtime.concentration_nm(tissue, float(t_h)) for t_h in time_grid],
+                [xc7_at_time_nm(float(t_h)) for t_h in time_grid],
                 dtype=float,
             )
-        y0 = steady_state_ic(float(h_grid[0]), params)
+        y0 = steady_state_ic(float(h_grid[0]), params, xc7_nm=xc7_at_time_nm(float(time_grid[0])))
 
-        y_sol = solve_trafficking_ivp(time_grid, h_grid, y0, params, solver_config=solver_config, tissue=tissue)
+        y_sol = solve_trafficking_ivp(
+            time_grid,
+            h_grid,
+            y0,
+            params,
+            solver_config=solver_config,
+            xc7_at_time_nm=xc7_at_time_nm,
+            tissue=tissue,
+        )
         _validate_tissue_receptor_invariants(time_grid, y_sol, tissue)
 
         tissue_frame = pd.DataFrame(

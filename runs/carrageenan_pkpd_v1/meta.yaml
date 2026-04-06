@@ -1,4 +1,4 @@
-config_sha256: 8f94998b4520ed3193d805d2f99fc8acea785e8da8211bb57b8d7c67896d9b13
+config_sha256: 198878050f220ec757a6403120f9cb963c539958b89adc2873eff216128cffe0
 config_schema_version: 1.2.0
 simulation_schema_version: 2.1.0
 column_order:
@@ -23,15 +23,17 @@ column_order:
 row_count: 580
 driver_type: scenario
 driver_id: carrageenan
-generated_at_utc: '2026-04-06T18:26:50Z'
+generated_at_utc: '2026-04-06T18:46:17Z'
 default_trafficking_params:
   k_int_max_per_h: 1.25
   k_rec_per_h: 0.5
   k_synth_per_h: 0.05
   ec50_barr_nm: 500.0
   ec50_internalization_nm: null
+  kb_arr_nm: 600.0
   hill_n: 1.0
   ec50_g_nm: 20.0
+  kb_g_nm: 6000.0
   constitutive_activity: 0.05
   h_base_nm: 10.0
 trafficking_params_by_tissue:
@@ -41,8 +43,10 @@ trafficking_params_by_tissue:
     k_synth_per_h: 0.05
     ec50_barr_nm: 500.0
     ec50_internalization_nm: null
+    kb_arr_nm: 600.0
     hill_n: 1.0
     ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
     constitutive_activity: 0.05
     h_base_nm: 10.0
   spinal_coord:
@@ -51,8 +55,10 @@ trafficking_params_by_tissue:
     k_synth_per_h: 0.05
     ec50_barr_nm: 500.0
     ec50_internalization_nm: null
+    kb_arr_nm: 600.0
     hill_n: 1.0
     ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
     constitutive_activity: 0.25
     h_base_nm: 2.0
   ganglia:
@@ -61,8 +67,10 @@ trafficking_params_by_tissue:
     k_synth_per_h: 0.05
     ec50_barr_nm: 1500.0
     ec50_internalization_nm: null
+    kb_arr_nm: 600.0
     hill_n: 1.0
     ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
     constitutive_activity: 0.1
     h_base_nm: 10.0
   brain:
@@ -71,8 +79,10 @@ trafficking_params_by_tissue:
     k_synth_per_h: 0.05
     ec50_barr_nm: 500.0
     ec50_internalization_nm: null
+    kb_arr_nm: 600.0
     hill_n: 1.0
     ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
     constitutive_activity: 0.25
     h_base_nm: 2.0
 solver_metadata:

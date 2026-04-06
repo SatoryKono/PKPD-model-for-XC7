@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from pkpd_xc7.models.receptor_trafficking import TraffickingCoreParams
+from pkpd_xc7.models.receptor_trafficking import TraffickingCoreParams, competitive_effective_histamine_nm
 
 
 def hill_activation(histamine_nm: float | np.ndarray, ec50_nm: float, hill_n: float) -> float | np.ndarray:
@@ -63,17 +63,44 @@ def beta_arr_fraction(
     histamine_nm: float | np.ndarray,
     params_or_ec50: TraffickingCoreParams | float,
     hill_n: float | None = None,
+    *,
+    xc7_nm: float | np.ndarray = 0.0,
+    kb_arr_nm: float | None = None,
 ) -> float | np.ndarray:
     """Return beta-arrestin pathway activation fraction in [0, 1]."""
     if isinstance(params_or_ec50, TraffickingCoreParams):
         ec50_barr_nm = params_or_ec50.ec50_barr_nm
         hill = params_or_ec50.hill_n
+        kb_arr = params_or_ec50.kb_arr_nm if kb_arr_nm is None else float(kb_arr_nm)
     else:
         if hill_n is None:
             raise TypeError("hill_n is required when params are not provided.")
         ec50_barr_nm = float(params_or_ec50)
         hill = float(hill_n)
-    return hill_activation(histamine_nm, ec50_barr_nm, hill)
+        if kb_arr_nm is None and np.any(np.asarray(xc7_nm, dtype=float) > 0.0):
+            raise TypeError("kb_arr_nm is required when xc7_nm is provided without params.")
+        kb_arr = 1.0 if kb_arr_nm is None else float(kb_arr_nm)
+
+    if np.isscalar(histamine_nm) and np.isscalar(xc7_nm):
+        histamine_scalar = float(np.asarray(histamine_nm, dtype=float).item())
+        xc7_scalar = float(np.asarray(xc7_nm, dtype=float).item())
+        effective_histamine_scalar = competitive_effective_histamine_nm(
+            histamine_scalar,
+            xc7_nm=xc7_scalar,
+            kb_nm=kb_arr,
+        )
+        return hill_activation(effective_histamine_scalar, ec50_barr_nm, hill)
+
+    histamine = np.asarray(histamine_nm, dtype=float)
+    xc7 = np.asarray(xc7_nm, dtype=float)
+    if np.any(xc7 < 0.0):
+        raise ValueError("xc7_nm must be non-negative.")
+    if kb_arr <= 0.0:
+        raise ValueError("kb_arr_nm must be positive.")
+
+    positive_histamine = np.clip(histamine, 0.0, None)
+    effective_histamine_arr = positive_histamine / (1.0 + (xc7 / kb_arr))
+    return hill_activation(effective_histamine_arr, ec50_barr_nm, hill)
 
 
 def g_signaling_fraction(

@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from pkpd_xc7.config.schemas import ModelConfig
-from pkpd_xc7.io.layout import SIMULATION_SCHEMA_VERSION, TIMESERIES_COLUMN_ORDER, enforce_timeseries_layout
+from pkpd_xc7.io.layout import (
+    ANTAGONIST_CONCENTRATION_COL,
+    SIMULATION_SCHEMA_VERSION,
+    TIMESERIES_COLUMN_ORDER,
+    enforce_timeseries_layout,
+)
 from pkpd_xc7.models.h3_signaling import beta_arr_fraction, g_signal_percent, g_signaling_fraction
 from pkpd_xc7.models.receptor_trafficking import (
     MODEL_RUNTIME_ASSUMPTION,
@@ -53,8 +59,10 @@ def test_model_config_to_trafficking_core_uses_schema_values() -> None:
                 "k_rec_per_h": 0.8,
                 "k_synth_per_h": 0.1,
                 "ec50_barr_nm": 1200.0,
+                "kb_arr_nm": 300.0,
                 "hill_n": 1.2,
                 "ec50_g_nm": 40.0,
+                "kb_g_nm": 25.0,
                 "constitutive_activity": 0.15,
             }
         )
@@ -64,6 +72,8 @@ def test_model_config_to_trafficking_core_uses_schema_values() -> None:
     assert params.k_int_max_per_h == pytest.approx(4.0)
     assert params.k_rec_per_h == pytest.approx(0.8)
     assert params.ec50_internalization_nm == pytest.approx(1200.0)
+    assert params.kb_arr_nm == pytest.approx(300.0)
+    assert params.kb_g_nm == pytest.approx(25.0)
     assert params.constitutive_activity == pytest.approx(0.15)
 
 
@@ -109,8 +119,9 @@ def test_k_int_eff_zero_and_large_histamine_behaviour() -> None:
 def test_analytic_steady_state_matches_rhs_equilibrium() -> None:
     params = model_config_to_trafficking_core(ModelConfig.model_validate(_payload()))
     h_base_nm = 50.0
-    y0 = steady_state_ic(h_base_nm, params)
-    dydt = receptor_trafficking_rhs(0.0, y0, h_base_nm, params)
+    xc7_nm = 25.0
+    y0 = steady_state_ic(h_base_nm, params, xc7_nm=xc7_nm)
+    dydt = receptor_trafficking_rhs(0.0, y0, h_base_nm, params, xc7_nm=xc7_nm)
 
     assert 0.0 <= y0[0] <= 1.0
     assert 0.0 <= y0[1] <= 1.0
@@ -187,7 +198,7 @@ def test_g_signaling_fraction_and_percent_are_bounded() -> None:
 
     assert g_signaling_fraction(-1.0, 1.0, params) == pytest.approx(0.1)
     assert g_signaling_fraction(50.0, 0.8, params) <= 1.0
-    assert beta_arr_fraction(50.0, params) <= 1.0
+    assert beta_arr_fraction(50.0, params, xc7_nm=25.0) <= 1.0
     assert internalization_drive(50.0, params) <= 1.0
     assert g_signal_percent(0.42) == pytest.approx(42.0)
 
@@ -195,7 +206,13 @@ def test_g_signaling_fraction_and_percent_are_bounded() -> None:
 def test_add_g_signal_columns_adds_report_space_columns_once() -> None:
     cfg = ModelConfig.model_validate(_payload())
     params = model_config_to_trafficking_core(cfg)
-    df = pd.DataFrame({"histamine_nm": [0.0, 50.0], "R_surf": [1.0, 0.5]})
+    df = pd.DataFrame(
+        {
+            "histamine_nm": [0.0, 50.0],
+            "R_surf": [1.0, 0.5],
+            ANTAGONIST_CONCENTRATION_COL: [0.0, 100.0],
+        }
+    )
 
     result = add_g_signal_columns(df, params)
 
@@ -210,6 +227,7 @@ def test_add_g_signal_columns_adds_report_space_columns_once() -> None:
     assert np.all((g_ligand_pct >= 0.0) & (g_ligand_pct <= 100.0))
     assert np.all((g_constitutive_pct >= 0.0) & (g_constitutive_pct <= 100.0))
     assert np.all((beta_arr_pct >= 0.0) & (beta_arr_pct <= 100.0))
+    assert result.loc[1, "internalization_drive"] < internalization_drive(50.0, params)
 
 
 def test_run_experiment_dataframe_keeps_g_signal_percent_in_sync() -> None:
@@ -287,4 +305,41 @@ def test_enforce_timeseries_layout_reorders_columns_deterministically() -> None:
     result = enforce_timeseries_layout(df)
 
     assert result.columns.tolist() == TIMESERIES_COLUMN_ORDER
-    assert SIMULATION_SCHEMA_VERSION == "2.0.0"
+    assert SIMULATION_SCHEMA_VERSION == "2.1.0"
+
+
+def test_antagonist_pk_reduces_internalization_and_uses_t0_concentration(tmp_path: Path) -> None:
+    source = tmp_path / "pk_source.xlsx"
+    pd.DataFrame(
+        [
+            {"species": "mice", "regimen": "single", "organ": "skin", "dose": 90.0, "time_h": 0.0, "C_nM": 120.0},
+            {"species": "mice", "regimen": "single", "organ": "skin", "dose": 90.0, "time_h": 1.0, "C_nM": 120.0},
+        ]
+    ).to_excel(source, index=False)
+    payload = _payload(
+        species="mouse",
+        time_grid_h=[0.0, 1.0],
+        trafficking={"h_base_nm": 50.0, "kb_arr_nm": 60.0},
+        antagonist_pk={
+            "enabled": True,
+            "source_xlsx": str(source),
+            "dose_mg_per_kg": 90.0,
+            "regimen": "single",
+            "concentration_column": "C_nM",
+            "tissue_map": {"skin": "skin"},
+        },
+    )
+    cfg_with_xc7 = ModelConfig.model_validate(payload)
+    cfg_without_xc7 = ModelConfig.model_validate(_payload(species="mouse", time_grid_h=[0.0, 1.0], trafficking={"h_base_nm": 50.0}))
+
+    with_xc7 = run_experiment(cfg_with_xc7)
+    without_xc7 = run_experiment(cfg_without_xc7)
+
+    params = model_config_to_trafficking_core(cfg_with_xc7)
+    at_t0 = with_xc7.loc[np.isclose(with_xc7["time_h"].to_numpy(dtype=float), 0.0)].iloc[0]
+    control_t0 = without_xc7.loc[np.isclose(without_xc7["time_h"].to_numpy(dtype=float), 0.0)].iloc[0]
+    expected_y0 = steady_state_ic(float(at_t0["histamine_nm"]), params, xc7_nm=float(at_t0[ANTAGONIST_CONCENTRATION_COL]))
+
+    assert at_t0["R_surf"] == pytest.approx(expected_y0[0])
+    assert at_t0["R_int"] == pytest.approx(expected_y0[1])
+    assert at_t0["R_int"] < control_t0["R_int"]

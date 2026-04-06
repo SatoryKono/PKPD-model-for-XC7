@@ -4,6 +4,7 @@
 
 ### Non-breaking
 
+- **XC7 competitive antagonism on internalization**: `internalization_drive`, `k_int_eff`, `steady_state_ic`, `receptor_trafficking_rhs`, and exported `beta_arr_signal` / `internalization_drive` / `k_int_eff_per_h` now account for tissue XC7 concentration through a competitive shift `H_eff = H / (1 + C / Kb_arr)`. New optional trafficking fields `kb_arr_nm` and `kb_g_nm` are accepted by the YAML schema and exported via resolved trafficking metadata; when omitted they deterministically fall back to the matching pathway EC50 values.
 - **Canonical CNS tissue ids**: scenario configs now use `spinal_coord` as the canonical CNS tissue id; legacy YAML alias `spinal` is normalized during config loading for backward compatibility. A temporary `brain` runtime profile is now registered as an explicit proxy of `spinal_coord`, and `examples/configs/shared/common.yaml` includes shared overrides for `muscle`, `spinal_coord`, `brain`, and `ganglia`.
 - **Tissue-specific scenario parameters**: `ModelConfig` now accepts optional `tissue_overrides` with per-tissue `trafficking` and formalin-only `formalin_profile` overrides. Resolution order is deterministic: registry defaults -> top-level config defaults -> `tissue_overrides[<tissue>]`.
 - **Resolved trafficking metadata**: `meta.yaml` now writes `default_trafficking_params` plus `trafficking_params_by_tissue`, so plotting and post-run analysis can reproduce the exact per-tissue pharmacology used by the simulation. Legacy loaders still accept older runs that only contain `trafficking_params`.

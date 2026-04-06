@@ -64,8 +64,10 @@ def model_config_to_trafficking_core(config: ModelConfig, tissue: str | None = N
             if trafficking.ec50_internalization_nm is None
             else trafficking.ec50_internalization_nm
         ),
+        kb_arr_nm=trafficking.ec50_barr_nm if trafficking.kb_arr_nm is None else trafficking.kb_arr_nm,
         hill_n=trafficking.hill_n,
         ec50_g_nm=trafficking.ec50_g_nm,
+        kb_g_nm=trafficking.ec50_g_nm if trafficking.kb_g_nm is None else trafficking.kb_g_nm,
         constitutive_activity=trafficking.constitutive_activity,
     )
 

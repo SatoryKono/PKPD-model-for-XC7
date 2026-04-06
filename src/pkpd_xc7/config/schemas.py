@@ -115,8 +115,10 @@ class TraffickingConfig(BaseModel):
     k_synth_per_h: float = Field(default=0.05, ge=0)
     ec50_barr_nm: float = Field(default=1500.0, gt=0)
     ec50_internalization_nm: float | None = Field(default=None, gt=0)
+    kb_arr_nm: float | None = Field(default=None, gt=0)
     hill_n: float = Field(default=1.0, gt=0)
     ec50_g_nm: float = Field(default=50.0, gt=0)
+    kb_g_nm: float | None = Field(default=None, gt=0)
     constitutive_activity: float = Field(default=0.0, ge=0, le=1)
     h_base_nm: float | None = Field(default=None, ge=0)
 
@@ -137,8 +139,10 @@ class TraffickingOverrideConfig(BaseModel):
     k_synth_per_h: float | None = Field(default=None, ge=0)
     ec50_barr_nm: float | None = Field(default=None, gt=0)
     ec50_internalization_nm: float | None = Field(default=None, gt=0)
+    kb_arr_nm: float | None = Field(default=None, gt=0)
     hill_n: float | None = Field(default=None, gt=0)
     ec50_g_nm: float | None = Field(default=None, gt=0)
+    kb_g_nm: float | None = Field(default=None, gt=0)
     constitutive_activity: float | None = Field(default=None, ge=0, le=1)
     h_base_nm: float | None = Field(default=None, ge=0)
 

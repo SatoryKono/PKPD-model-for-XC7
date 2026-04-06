@@ -157,7 +157,34 @@ formalin_profile:
 - В runtime все вычисления `H(t)` выполняются только в часах (`t_h`).
 - Реестр сценариев хранит параметры только в часах и нМ.
 
-## 6. Трассируемость и допущения
+## 6. `trafficking` и конкурентный антагонизм XC7
+
+Блок `trafficking` остаётся источником правды для параметров H3R-траффикинга и pathway-specific фармакологии:
+
+```yaml
+trafficking:
+  k_int_max_per_h: 1.25
+  k_rec_per_h: 0.5
+  k_synth_per_h: 0.05
+  ec50_barr_nm: 500.0
+  ec50_internalization_nm: 500.0
+  kb_arr_nm: 500.0
+  hill_n: 1.0
+  ec50_g_nm: 20.0
+  kb_g_nm: 20.0
+  constitutive_activity: 0.05
+  h_base_nm: 10.0
+```
+
+Важно:
+
+- `kb_arr_nm` задаёт конкурентный сдвиг XC7 для arrestin/internalization pathway.
+- В текущем runtime используется формула `histamine_eff_nm = histamine_nm / (1 + xc7_nm / kb_arr_nm)`.
+- Это влияет на `internalization_drive`, `k_int_eff`, `steady_state_ic`, `receptor_trafficking_rhs`, а также на экспортируемые `beta_arr_signal`, `internalization_drive` и `k_int_eff_per_h`.
+- `kb_g_nm` уже принят схемой и попадает в `meta.yaml`, но пока зарезервирован для будущего расширения G-signaling pathway.
+- Если `kb_arr_nm` или `kb_g_nm` не заданы явно, runtime детерминированно использует fallback к соответствующему `ec50_barr_nm` или `ec50_g_nm`.
+
+## 7. Трассируемость и допущения
 
 Обязательные требования:
 
@@ -171,7 +198,7 @@ formalin_profile:
 - `formalin override timings were transcribed in minutes and converted to hours at runtime`
 - `zymosan uses gaussian_sum MVP profile until logistic_exp is introduced`
 
-## 7. Примеры
+## 8. Примеры
 
 ### Пример 1. Formalin с override
 
@@ -249,7 +276,7 @@ time_grid_h:
   - 2.0
 ```
 
-## 8. Канонические scenario-конфиги
+## 9. Канонические scenario-конфиги
 
 Для 7 сценарных моделей актуальные примеры вынесены в отдельный каталог:
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from pkpd_xc7.io.layout import (
+    ANTAGONIST_CONCENTRATION_COL,
     BETA_ARR_SIGNAL_COL,
     BETA_ARR_SIGNAL_PCT_COL,
     G_SIGNAL_COL,
@@ -37,12 +38,18 @@ def add_g_signal_columns(
     result = df.copy()
     histamine = result[histamine_col].to_numpy()
     r_surf = result[r_surf_col].to_numpy()
+    if ANTAGONIST_CONCENTRATION_COL in result.columns:
+        xc7 = result[ANTAGONIST_CONCENTRATION_COL].fillna(0.0).to_numpy(dtype=float)
+    else:
+        xc7 = pd.Series([0.0] * len(result.index), index=result.index, dtype=float).to_numpy(dtype=float)
     g_signal_total = g_signaling_fraction(histamine, r_surf, params)
     g_signal_ligand = agonist_g_signal_fraction(histamine, r_surf, params)
     g_signal_constitutive = constitutive_signal_fraction(r_surf, params)
-    beta_arr_signal = beta_arr_fraction(histamine, params)
-    int_drive = [internalization_drive(float(h), params) for h in histamine]
-    k_int_values = [k_int_eff(float(h), params) for h in histamine]
+    beta_arr_signal = [beta_arr_fraction(float(h), params, xc7_nm=float(c)) for h, c in zip(histamine, xc7, strict=False)]
+    int_drive = [
+        internalization_drive(float(h), params, xc7_nm=float(c)) for h, c in zip(histamine, xc7, strict=False)
+    ]
+    k_int_values = [k_int_eff(float(h), params, xc7_nm=float(c)) for h, c in zip(histamine, xc7, strict=False)]
 
     result[G_SIGNAL_COL] = g_signal_total
     result[G_SIGNAL_PCT_COL] = g_signal_percent(g_signal_total)
