@@ -24,6 +24,7 @@ class PKDriver(BaseModel):
 ScenarioProfileShape = Literal["pulse", "gaussian_sum"]
 CANONICAL_SCENARIO_IDS: tuple[str, ...] = (
     "formalin",
+    "intact",
     "capsaicin",
     "carrageenan",
     "hot_plate",
@@ -245,6 +246,10 @@ class ModelConfig(BaseModel):
     formalin_profile: FormalinProfileOverrides | None = Field(
         default=None,
         description="Опциональные overrides для scenario_id=formalin.",
+    )
+    intact_profile: FormalinProfileOverrides | None = Field(
+        default=None,
+        description="Опциональные overrides для scenario_id=intact (та же схема, что formalin_profile).",
     )
     tissue_overrides: dict[str, TissueOverrideConfig] = Field(
         default_factory=dict,

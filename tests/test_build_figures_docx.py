@@ -114,6 +114,22 @@ def test_build_figures_docx_writes_media_and_document_xml(tmp_path: Path) -> Non
         assert '<w:br w:type="page"/>' in document_xml
 
 
+def test_build_figures_docx_is_deterministic(tmp_path: Path) -> None:
+    module = _load_module()
+    figures_dir = tmp_path / "figures"
+    figures_dir.mkdir()
+    _write_tiny_png(figures_dir / "fig1_1_formalin_histamine.png")
+    _write_tiny_png(figures_dir / "fig1_3_formalin_gsignaling.png")
+
+    out_path_1 = tmp_path / "bundle-1.docx"
+    out_path_2 = tmp_path / "bundle-2.docx"
+
+    module.build_figures_docx(figures_dir, out_path_1, title="PKPD Test Figures")
+    module.build_figures_docx(figures_dir, out_path_2, title="PKPD Test Figures")
+
+    assert out_path_1.read_bytes() == out_path_2.read_bytes()
+
+
 def test_caption_overrides_cover_formalin_and_capsaicin() -> None:
     module = _load_module()
     assert module.FIGURE_CAPTION_OVERRIDES["fig1_3_formalin_gsignaling.png"].startswith("Рисунок 1.3")
@@ -121,5 +137,5 @@ def test_caption_overrides_cover_formalin_and_capsaicin() -> None:
     assert (
         module.FIGURE_CAPTION_OVERRIDES["fig3_1_capsaicin_histamine.png"]
         == "Рисунок 3.1 Модель болевого синдрома, индуцированная введением капсаицина. "
-        "Изменение концентрации гистамина после индукции паталогии."
+        "Изменение концентрации гистамина после индукции патологии."
     )

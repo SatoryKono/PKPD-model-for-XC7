@@ -181,6 +181,20 @@ def _build_formalin_spec() -> ScenarioSpec:
     )
 
 
+def _build_intact_spec() -> ScenarioSpec:
+    """Те же базовые профили, что у formalin; идентификатор для YAML с intact_profile."""
+    base = _build_formalin_spec()
+    return ScenarioSpec(
+        scenario_id="intact",
+        default_shape=base.default_shape,
+        supported_shapes=base.supported_shapes,
+        tissue_profiles=dict(base.tissue_profiles),
+        profile_shape=base.profile_shape,
+        tissue_profile_shapes=dict(base.tissue_profile_shapes),
+        notes=base.notes,
+    )
+
+
 def _build_capsaicin_spec() -> ScenarioSpec:
     spinal_coord = TissueProfile(h_base_nm=2.0, gaussian_components=(_gaussian(2.3, 90.0, 60.0),))
     return _build_spec(
@@ -286,6 +300,7 @@ def _build_zymosan_spec() -> ScenarioSpec:
 
 REGISTERED_SCENARIOS: dict[str, ScenarioSpec] = {
     "formalin": _build_formalin_spec(),
+    "intact": _build_intact_spec(),
     "capsaicin": _build_capsaicin_spec(),
     "carrageenan": _build_carrageenan_spec(),
     "hot_plate": _build_hot_plate_spec(),
@@ -326,18 +341,23 @@ def _clone_with_shape(
     )
 
 
-def _resolve_formalin_shape(config: ModelConfig, base: ScenarioSpec) -> ScenarioProfileShape:
+def _resolve_formalin_shape(
+    config: ModelConfig,
+    base: ScenarioSpec,
+    top_level: FormalinProfileOverrides | None,
+) -> ScenarioProfileShape:
     if config.driver.driver_type != "scenario":
         raise ValueError("_resolve_formalin_shape expects a scenario driver.")
 
     override_shape: ProfileShape | None = None
-    if config.formalin_profile is not None:
-        override_shape = config.formalin_profile.profile_shape
+    if top_level is not None:
+        override_shape = top_level.profile_shape
     chosen_shape = override_shape or config.driver.profile_shape or base.default_shape
     if chosen_shape not in base.supported_shapes:
         allowed = ", ".join(sorted(base.supported_shapes))
         raise ValueError(
-            f"Unsupported profile_shape='{chosen_shape}' for scenario_id='formalin'. Expected one of: {allowed}."
+            f"Unsupported profile_shape='{chosen_shape}' for scenario_id='{base.scenario_id}'. "
+            f"Expected one of: {allowed}."
         )
     return cast(ScenarioProfileShape, chosen_shape)
 
@@ -356,7 +376,8 @@ def _resolve_formalin_tissue_shape(
     if chosen_shape not in base.supported_shapes:
         allowed = ", ".join(sorted(base.supported_shapes))
         raise ValueError(
-            f"Unsupported profile_shape='{chosen_shape}' for scenario_id='formalin' tissue='{tissue_name}'. Expected one of: {allowed}."
+            f"Unsupported profile_shape='{chosen_shape}' for scenario_id='{base.scenario_id}' "
+            f"tissue='{tissue_name}'. Expected one of: {allowed}."
         )
     return cast(ScenarioProfileShape, chosen_shape)
 
@@ -421,9 +442,12 @@ def _apply_formalin_overrides(
     )
 
 
-def resolve_formalin_spec(config: ModelConfig) -> ScenarioSpec:
-    base = get_scenario_spec("formalin")
-    shape = _resolve_formalin_shape(config, base)
+def _resolve_formalin_like_spec(
+    config: ModelConfig,
+    base: ScenarioSpec,
+    top_level: FormalinProfileOverrides | None,
+) -> ScenarioSpec:
+    shape = _resolve_formalin_shape(config, base, top_level)
     resolved_shapes: dict[str, ScenarioProfileShape] = {}
     resolved_profiles = {
         tissue_name: _apply_formalin_overrides(
@@ -433,7 +457,7 @@ def resolve_formalin_spec(config: ModelConfig) -> ScenarioSpec:
                     resolve_trafficking_config(config, tissue_name).h_base_nm,
                 ),
                 shape=_resolve_formalin_tissue_shape(tissue_name, config, base, shape),
-                overrides=config.formalin_profile,
+                overrides=top_level,
             ),
             shape=_resolve_formalin_tissue_shape(tissue_name, config, base, shape),
             overrides=(
@@ -449,6 +473,17 @@ def resolve_formalin_spec(config: ModelConfig) -> ScenarioSpec:
     return _clone_with_shape(base, shape, resolved_profiles, tissue_shapes=resolved_shapes)
 
 
+def resolve_formalin_spec(config: ModelConfig) -> ScenarioSpec:
+    base = get_scenario_spec("formalin")
+    return _resolve_formalin_like_spec(config, base, config.formalin_profile)
+
+
+def resolve_intact_spec(config: ModelConfig) -> ScenarioSpec:
+    base = get_scenario_spec("intact")
+    top = config.intact_profile if config.intact_profile is not None else config.formalin_profile
+    return _resolve_formalin_like_spec(config, base, top)
+
+
 def resolve_scenario_spec(config: ModelConfig) -> ScenarioSpec:
     if config.driver.driver_type != "scenario":
         raise ValueError("resolve_scenario_spec expects a scenario driver.")
@@ -457,6 +492,8 @@ def resolve_scenario_spec(config: ModelConfig) -> ScenarioSpec:
     base = get_scenario_spec(driver.scenario_id)
     if base.scenario_id == "formalin":
         return resolve_formalin_spec(config)
+    if base.scenario_id == "intact":
+        return resolve_intact_spec(config)
 
     chosen_shape = driver.profile_shape or base.default_shape
     if chosen_shape not in base.supported_shapes:

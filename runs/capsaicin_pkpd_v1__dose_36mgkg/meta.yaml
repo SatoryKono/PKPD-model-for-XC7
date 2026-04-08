@@ -1,0 +1,125 @@
+config_sha256: 5729a6957ec330fe192a047342cceddf7fd63b4cb2de1b7a44a2ed64156fbf7b
+config_schema_version: 1.2.0
+simulation_schema_version: 2.1.0
+column_order:
+- time_h
+- tissue
+- histamine_nm
+- R_surf
+- R_int
+- G_signal
+- G_signal_pct
+- G_signal_ligand
+- G_signal_ligand_pct
+- G_signal_constitutive
+- G_signal_constitutive_pct
+- beta_arr_signal
+- beta_arr_signal_pct
+- internalization_drive
+- k_int_eff_per_h
+- driver_type
+- driver_id
+- antagonist_concentration_nm
+row_count: 200
+driver_type: scenario
+driver_id: capsaicin
+generated_at_utc: '2026-04-07T17:56:25Z'
+default_trafficking_params:
+  k_int_max_per_h: 1.25
+  k_rec_per_h: 0.5
+  k_synth_per_h: 0.05
+  ec50_barr_nm: 500.0
+  ec50_internalization_nm: null
+  kb_arr_nm: 600.0
+  hill_n: 1.0
+  ec50_g_nm: 20.0
+  kb_g_nm: 6000.0
+  constitutive_activity: 0.05
+  h_base_nm: 10.0
+trafficking_params_by_tissue:
+  skin:
+    k_int_max_per_h: 1.25
+    k_rec_per_h: 0.5
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 500.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 600.0
+    hill_n: 1.0
+    ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.05
+    h_base_nm: 50.0
+  spinal_coord:
+    k_int_max_per_h: 1.4
+    k_rec_per_h: 0.8
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 500.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 600.0
+    hill_n: 1.0
+    ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.25
+    h_base_nm: 2.0
+  ganglia:
+    k_int_max_per_h: 1.8
+    k_rec_per_h: 0.7
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 500.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 600.0
+    hill_n: 1.0
+    ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.1
+    h_base_nm: 10.0
+  brain:
+    k_int_max_per_h: 1.4
+    k_rec_per_h: 0.8
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 500.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 600.0
+    hill_n: 1.0
+    ec50_g_nm: 20.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.25
+    h_base_nm: 2.0
+solver_metadata:
+  solver_method: LSODA
+  rtol: 0.001
+  atol: 1.0e-06
+  max_step: null
+runtime_assumptions:
+- canonical scenario_id capsaicin is used directly
+- skin, spinal_coord, and ganglia H(t) profiles are taken from scenario_registry as
+  the source of truth
+- brain is included as a mandatory CNS tissue and currently uses a spinal_coord proxy
+  profile until a source-backed brain profile is introduced
+- top-level trafficking acts as deterministic defaults before tissue_overrides are
+  applied
+- skin h_base_nm is overridden to 50 nM so the marker-tissue H(t) peak matches the
+  tabulated 227 nM at 15 min
+- k_deg implicitly equals k_synth per ODE mass-balance invariant
+- XC7 concentration-time profiles are interpolated from the configured XLSX source
+  using time=linear, dose=log-linear, extrapolation=clip, species=rat, regimen=single,
+  dose=36 mg/kg.
+antagonist_pk:
+  enabled: true
+  source_xlsx: examples\configs\shared\SINGLE_REP_pred_mice_rats.xlsx
+  sheet_name: 0
+  species: rat
+  regimen: single
+  dose_mg_per_kg: 36.0
+  concentration_column: C_nM
+  tissue_map:
+    skin: skin
+    muscle: muscles
+    spinal_coord: spinal cord
+    brain: brain
+    ganglia: sympathetic ganglia
+    peritoneum: peritoneum
+  method_time: linear
+  method_dose: log-linear
+  extrapolation: clip
+  allow_single_dose_scaling: false

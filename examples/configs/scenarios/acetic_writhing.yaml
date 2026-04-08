@@ -25,9 +25,9 @@ driver:
   scenario_id: acetic_writhing
 
 antagonist_pk:
-  regimen: repeated
+  regimen: single
   tissue_map:
-    peritoneum: bladder
+    peritoneum: muscle
 
 tissue_overrides:
   peritoneum:

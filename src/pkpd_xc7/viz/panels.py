@@ -48,6 +48,7 @@ TISSUE_COLORS: dict[str, str] = {
 }
 EC50_COLOR = "#888888"
 CA_COLOR = "#aaaaaa"
+INTACT_G_SIGNAL_LINEWIDTH = 0.8
 FILL_ALPHA = 0.15
 LEGEND_UPPER_RIGHT = "upper right"
 
@@ -63,8 +64,8 @@ class ScenarioPlotSpec:
 @dataclass(frozen=True, slots=True)
 class ScenarioFigureArtifacts:
     out_dir: Path
-    histamine_png: Path
-    receptor_png: Path
+    histamine_png: Path | None
+    receptor_png: Path | None
     g_signal_png: Path
     antagonist_png: Path | None = None
 
@@ -217,8 +218,27 @@ def plot_scenario_run_figures(
     spec: ScenarioPlotSpec,
     *,
     out_dir: Path | str,
+    baseline_run: SimulationRun | None = None,
+    intact_reference_run: SimulationRun | None = None,
+    render_histamine_figure: bool = True,
+    render_internalization_figure: bool = True,
+    plot_g_signal_without_internalization: bool = True,
+    render_antagonist_figure: bool = True,
 ) -> ScenarioFigureArtifacts:
-    """Render the canonical three-panel report figures for a simulation run."""
+    """Render the canonical three-panel report figures for a simulation run.
+
+    Optional ``intact_reference_run`` (e.g. intact scenario, 0 mg/kg) adds a G-signaling overlay only;
+    histamine and internalization panels still use ``baseline_run`` when provided.
+
+    When ``render_histamine_figure`` or ``render_internalization_figure`` is false, that PNG is not
+    written and the corresponding path in ``ScenarioFigureArtifacts`` is ``None``.
+
+    When ``plot_g_signal_without_internalization`` is false, the «Без интернализации» line and its
+    ``fill_between`` band are omitted on the G-signaling panel.
+
+    When ``render_antagonist_figure`` is false, the XC7 concentration panel is not written even if
+    antagonist data are present; ``antagonist_png`` is ``None``.
+    """
     params_by_tissue = _extract_trafficking_params_by_tissue(run)
 
     tissues = _iter_tissue_frames(run.timeseries, spec.tissue_order)
@@ -229,112 +249,157 @@ def plot_scenario_run_figures(
     x_max = float(
         np.max(time_minutes_from_hours(run.timeseries[TIME_H_COL].to_numpy(dtype=float)))
     )
+    baseline_by_tissue: dict[str, pd.DataFrame] = {}
+    if baseline_run is not None:
+        baseline_by_tissue = dict(_iter_tissue_frames(baseline_run.timeseries, spec.tissue_order))
 
-    histamine_png = resolved_out_dir / f"fig{spec.figure_group}_1_{spec.file_stem}_histamine.png"
-    receptor_png = (
-        resolved_out_dir / f"fig{spec.figure_group}_2_{spec.file_stem}_internalization.png"
-    )
+    intact_by_tissue: dict[str, pd.DataFrame] = {}
+    if intact_reference_run is not None:
+        intact_by_tissue = dict(_iter_tissue_frames(intact_reference_run.timeseries, spec.tissue_order))
+
+    histamine_png: Path | None = None
+    receptor_png: Path | None = None
+    histamine_target = resolved_out_dir / f"fig{spec.figure_group}_1_{spec.file_stem}_histamine.png"
+    receptor_target = resolved_out_dir / f"fig{spec.figure_group}_2_{spec.file_stem}_internalization.png"
     g_signal_png = resolved_out_dir / f"fig{spec.figure_group}_3_{spec.file_stem}_gsignaling.png"
     antagonist_png = resolved_out_dir / f"fig{spec.figure_group}_4_{spec.file_stem}_xc7_concentration.png"
 
-    fig_histamine, axes_histamine = _make_axes(len(tissues))
-    for ax, (tissue, tissue_df) in zip(axes_histamine, tissues):
-        traffic = _params_for_tissue(params_by_tissue, tissue)
-        ec50_g_nm = _get_float_param(traffic, "ec50_g_nm")
-        ec50_barr_nm = _get_float_param(traffic, "ec50_barr_nm")
-        time_min = time_minutes_from_hours(tissue_df[TIME_H_COL].to_numpy(dtype=float))
-        histamine_nm = tissue_df[HISTAMINE_COL].to_numpy(dtype=float)
-        histamine_um = histamine_nm / 1000.0
-        color = _tissue_color(tissue)
-        label = _tissue_label(tissue)
-        base_um = histamine_um[0]
+    if render_histamine_figure:
+        fig_histamine, axes_histamine = _make_axes(len(tissues))
+        for ax, (tissue, tissue_df) in zip(axes_histamine, tissues):
+            traffic = _params_for_tissue(params_by_tissue, tissue)
+            ec50_g_nm = _get_float_param(traffic, "ec50_g_nm")
+            ec50_barr_nm = _get_float_param(traffic, "ec50_barr_nm")
+            time_min = time_minutes_from_hours(tissue_df[TIME_H_COL].to_numpy(dtype=float))
+            histamine_nm = tissue_df[HISTAMINE_COL].to_numpy(dtype=float)
+            histamine_um = histamine_nm / 1000.0
+            color = _tissue_color(tissue)
+            label = _tissue_label(tissue)
+            base_um = histamine_um[0]
 
-        ax.plot(time_min, histamine_um, color=color, linewidth=2.0)
-        ax.axhline(ec50_g_nm / 1000.0, color=EC50_COLOR, linestyle="--", linewidth=1.0, label="EC50(G)")
-        ax.axhline(
-            ec50_barr_nm / 1000.0,
-            color=EC50_COLOR,
-            linestyle=":",
-            linewidth=1.0,
-            label="EC50(β-arr)",
-        )
-        ax.axhline(base_um, color=color, linestyle=":", linewidth=0.8, alpha=0.5)
+            ax.plot(time_min, histamine_um, color=color, linewidth=2.0)
+            baseline_tissue_df = baseline_by_tissue.get(tissue)
+            if baseline_tissue_df is not None:
+                baseline_time_min = time_minutes_from_hours(
+                    baseline_tissue_df[TIME_H_COL].to_numpy(dtype=float)
+                )
+                baseline_histamine_um = baseline_tissue_df[HISTAMINE_COL].to_numpy(dtype=float) / 1000.0
+                ax.plot(
+                    baseline_time_min,
+                    baseline_histamine_um,
+                    color="#808080",
+                    linewidth=1.0,
+                    linestyle=":",
+                    label="Контроль (0 mg/kg)",
+                )
+            ax.axhline(ec50_g_nm / 1000.0, color=EC50_COLOR, linestyle="--", linewidth=1.0, label="EC50(G)")
+            ax.axhline(
+                ec50_barr_nm / 1000.0,
+                color=EC50_COLOR,
+                linestyle=":",
+                linewidth=1.0,
+                label="EC50(β-arr)",
+            )
+            ax.axhline(base_um, color=color, linestyle=":", linewidth=0.8, alpha=0.5)
 
-        peak_idx = int(np.argmax(histamine_um))
-        ax.annotate(
-            _format_peak_label(histamine_um[peak_idx], "мкМ", time_min[peak_idx], decimals=2),
-            xy=(time_min[peak_idx], histamine_um[peak_idx]),
-            xytext=(time_min[peak_idx], histamine_um[peak_idx] * 0.82 if histamine_um[peak_idx] > 0 else 0.02),
-            fontsize=7.5,
-            color=color,
-            arrowprops={"arrowstyle": "->", "color": color, "lw": 0.7},
-        )
-        ax.annotate(
-            f"База: {base_um:.3f} мкМ",
-            xy=(x_max, base_um),
-            ha="right",
-            va="bottom",
-            fontsize=7.5,
-            color="#555555",
-        )
-        _style_axis(ax, x_max, "Концентрация (мкМ)", label)
-        ax.legend(fontsize=7.5, loc=LEGEND_UPPER_RIGHT, framealpha=0.8)
-    # Figure-level title intentionally disabled.
-    # fig_histamine.suptitle(
-    #     f"Рис. {spec.figure_group}.1. Динамика концентрации гистамина — {spec.model_title}",
-    #     fontsize=10,
-    #     fontweight="bold",
-    #     y=1.02,
-    # )
-    _save_figure(fig_histamine, histamine_png)
+            peak_idx = int(np.argmax(histamine_um))
+            ax.annotate(
+                _format_peak_label(histamine_um[peak_idx], "мкМ", time_min[peak_idx], decimals=2),
+                xy=(time_min[peak_idx], histamine_um[peak_idx]),
+                xytext=(time_min[peak_idx], histamine_um[peak_idx] * 0.82 if histamine_um[peak_idx] > 0 else 0.02),
+                fontsize=7.5,
+                color=color,
+                arrowprops={"arrowstyle": "->", "color": color, "lw": 0.7},
+            )
+            ax.annotate(
+                f"База: {base_um:.3f} мкМ",
+                xy=(x_max, base_um),
+                ha="right",
+                va="bottom",
+                fontsize=7.5,
+                color="#555555",
+            )
+            _style_axis(ax, x_max, "Концентрация (мкМ)", label)
+            ax.legend(fontsize=7.5, loc=LEGEND_UPPER_RIGHT, framealpha=0.8)
+        # Figure-level title intentionally disabled.
+        # fig_histamine.suptitle(
+        #     f"Рис. {spec.figure_group}.1. Динамика концентрации гистамина — {spec.model_title}",
+        #     fontsize=10,
+        #     fontweight="bold",
+        #     y=1.02,
+        # )
+        _save_figure(fig_histamine, histamine_target)
+        histamine_png = histamine_target
 
-    fig_receptor, axes_receptor = _make_axes(len(tissues))
-    for ax, (tissue, tissue_df) in zip(axes_receptor, tissues):
-        time_min = time_minutes_from_hours(tissue_df[TIME_H_COL].to_numpy(dtype=float))
-        r_surf_pct = tissue_df[R_SURF_COL].to_numpy(dtype=float) * 100.0
-        r_int_pct = tissue_df[R_INT_COL].to_numpy(dtype=float) * 100.0
-        color = _tissue_color(tissue)
-        label = _tissue_label(tissue)
+    if render_internalization_figure:
+        fig_receptor, axes_receptor = _make_axes(len(tissues))
+        for ax, (tissue, tissue_df) in zip(axes_receptor, tissues):
+            time_min = time_minutes_from_hours(tissue_df[TIME_H_COL].to_numpy(dtype=float))
+            r_surf_pct = tissue_df[R_SURF_COL].to_numpy(dtype=float) * 100.0
+            r_int_pct = tissue_df[R_INT_COL].to_numpy(dtype=float) * 100.0
+            color = _tissue_color(tissue)
+            label = _tissue_label(tissue)
 
-        ax.plot(time_min, r_surf_pct, color=color, linewidth=2.0, label="На поверхности (R_surf)")
-        ax.plot(
-            time_min,
-            r_int_pct,
-            color=color,
-            linewidth=1.5,
-            linestyle="--",
-            label="В эндосомах (R_int)",
-        )
-        ax.fill_between(time_min, 0.0, r_int_pct, alpha=FILL_ALPHA, color=color)
+            ax.plot(time_min, r_surf_pct, color=color, linewidth=2.0, label="На поверхности (R_surf)")
+            baseline_tissue_df = baseline_by_tissue.get(tissue)
+            if baseline_tissue_df is not None:
+                baseline_time_min = time_minutes_from_hours(
+                    baseline_tissue_df[TIME_H_COL].to_numpy(dtype=float)
+                )
+                baseline_r_surf_pct = baseline_tissue_df[R_SURF_COL].to_numpy(dtype=float) * 100.0
+                ax.plot(
+                    baseline_time_min,
+                    baseline_r_surf_pct,
+                    color="#808080",
+                    linewidth=1.6,
+                    linestyle="-",
+                    label="Контроль (XC7DCH 0 mg/kg), R_surf",
+                )
+            ax.plot(
+                time_min,
+                r_int_pct,
+                color=color,
+                linewidth=1.5,
+                linestyle="--",
+                label="В эндосомах (R_int)",
+            )
+            ax.fill_between(time_min, 0.0, r_int_pct, alpha=FILL_ALPHA, color=color)
 
-        peak_idx = int(np.argmax(r_int_pct))
-        ax.annotate(
-            _format_peak_label(r_int_pct[peak_idx], "%", time_min[peak_idx], decimals=1),
-            xy=(time_min[peak_idx], r_int_pct[peak_idx]),
-            xytext=(time_min[peak_idx], min(r_int_pct[peak_idx] + 5.0, 100.0)),
-            fontsize=7.5,
-            color=color,
-            arrowprops={"arrowstyle": "->", "color": color, "lw": 0.7},
-        )
-        ax.annotate(
-            f"{r_surf_pct[-1]:.1f}%",
-            xy=(x_max, r_surf_pct[-1]),
-            ha="right",
-            va="bottom",
-            fontsize=7.5,
-            color=color,
-        )
-        _style_axis(ax, x_max, "Рецепторы H3R (% от общего пула)", label)
-        ax.set_ylim(-1.0, 105.0)
-        ax.legend(fontsize=7.5, loc="lower right", framealpha=0.8)
-    # Figure-level title intentionally disabled.
-    # fig_receptor.suptitle(
-    #     f"Рис. {spec.figure_group}.2. Интернализация и ресайклинг H3R — {spec.model_title}",
-    #     fontsize=10,
-    #     fontweight="bold",
-    #     y=1.02,
-    # )
-    _save_figure(fig_receptor, receptor_png)
+            peak_idx = int(np.argmax(r_int_pct))
+            ax.annotate(
+                _format_peak_label(r_int_pct[peak_idx], "%", time_min[peak_idx], decimals=1),
+                xy=(time_min[peak_idx], r_int_pct[peak_idx]),
+                xytext=(time_min[peak_idx], min(r_int_pct[peak_idx] + 5.0, 100.0)),
+                fontsize=7.5,
+                color=color,
+                arrowprops={"arrowstyle": "->", "color": color, "lw": 0.7},
+            )
+            ax.annotate(
+                f"{r_surf_pct[-1]:.1f}%",
+                xy=(x_max, r_surf_pct[-1]),
+                ha="right",
+                va="bottom",
+                fontsize=7.5,
+                color=color,
+            )
+            _style_axis(ax, x_max, "Рецепторы H3R (% от общего пула)", label)
+            ax.set_ylim(-1.0, 105.0)
+            ax.legend(fontsize=7.5, loc="lower right", framealpha=0.8)
+        # Figure-level title intentionally disabled.
+        # fig_receptor.suptitle(
+        #     f"Рис. {spec.figure_group}.2. Интернализация и ресайклинг H3R — {spec.model_title}",
+        #     fontsize=10,
+        #     fontweight="bold",
+        #     y=1.02,
+        # )
+        _save_figure(fig_receptor, receptor_target)
+        receptor_png = receptor_target
+
+    antagonist_meta = _extract_antagonist_pk_meta(run)
+    main_dose_mg_kg = 0.0
+    if antagonist_meta is not None and antagonist_meta.get("dose_mg_per_kg") is not None:
+        main_dose_mg_kg = float(antagonist_meta["dose_mg_per_kg"])
+    main_g_signal_label = f"XC7DCH, {main_dose_mg_kg:g} mg/kg"
 
     fig_g_signal, axes_g_signal = _make_axes(len(tissues))
     for ax, (tissue, tissue_df) in zip(axes_g_signal, tissues):
@@ -352,21 +417,60 @@ def plot_scenario_run_figures(
         color = _tissue_color(tissue)
         label = _tissue_label(tissue)
 
-        ax.plot(
-            time_min,
-            g_without_pct,
-            color=color,
-            linewidth=1.5,
-            linestyle=":",
-            label="Без интернализации",
-        )
+        baseline_tissue_df = baseline_by_tissue.get(tissue)
+        if baseline_tissue_df is not None:
+            baseline_time_min = time_minutes_from_hours(
+                baseline_tissue_df[TIME_H_COL].to_numpy(dtype=float)
+            )
+            baseline_g_with_pct, _, _ = _g_signal_plot_series(
+                baseline_tissue_df,
+                ec50_g_nm=ec50_g_nm,
+                hill_n=hill_n,
+                constitutive_activity=constitutive_activity,
+            )
+            ax.plot(
+                baseline_time_min,
+                baseline_g_with_pct,
+                color="#808080",
+                linewidth=1.6,
+                linestyle="-",
+                label="Контроль (XC7DCH 0 mg/kg)",
+            )
+        intact_tissue_df = intact_by_tissue.get(tissue)
+        if intact_tissue_df is not None:
+            intact_time_min = time_minutes_from_hours(
+                intact_tissue_df[TIME_H_COL].to_numpy(dtype=float)
+            )
+            intact_g_with_pct, _, _ = _g_signal_plot_series(
+                intact_tissue_df,
+                ec50_g_nm=ec50_g_nm,
+                hill_n=hill_n,
+                constitutive_activity=constitutive_activity,
+            )
+            ax.plot(
+                intact_time_min,
+                intact_g_with_pct,
+                color="#808080",
+                linewidth=INTACT_G_SIGNAL_LINEWIDTH,
+                linestyle=":",
+                label="Интакт",
+            )
+        if plot_g_signal_without_internalization:
+            ax.plot(
+                time_min,
+                g_without_pct,
+                color=color,
+                linewidth=1.5,
+                linestyle=":",
+                label="Без интернализации",
+            )
         ax.plot(
             time_min,
             g_with_pct,
             color=color,
             linewidth=2.0,
             linestyle="-",
-            label="С интернализацией",
+            label=main_g_signal_label,
         )
         ax.plot(
             time_min,
@@ -374,9 +478,10 @@ def plot_scenario_run_figures(
             color=CA_COLOR,
             linewidth=1.0,
             linestyle="--",
-            label="Конститутивная акт.",
+            label="Конститутивная активность H3R.",
         )
-        ax.fill_between(time_min, g_with_pct, g_without_pct, alpha=FILL_ALPHA, color=color)
+        if plot_g_signal_without_internalization:
+            ax.fill_between(time_min, g_with_pct, g_without_pct, alpha=FILL_ALPHA, color=color)
 
         peak_idx = int(np.argmax(g_with_pct))
         ax.annotate(
@@ -407,13 +512,12 @@ def plot_scenario_run_figures(
     # )
     _save_figure(fig_g_signal, g_signal_png)
 
-    antagonist_meta = _extract_antagonist_pk_meta(run)
     antagonist_available = (
         ANTAGONIST_CONCENTRATION_COL in run.timeseries.columns
         and not run.timeseries[ANTAGONIST_CONCENTRATION_COL].isna().all()
     )
     resolved_antagonist_png: Path | None = None
-    if antagonist_available:
+    if render_antagonist_figure and antagonist_available:
         dose_label = None
         species_label = None
         regimen_label = None

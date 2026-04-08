@@ -12,13 +12,14 @@ from pkpd_xc7.io.layout import SIMULATION_SCHEMA_VERSION, TIMESERIES_COLUMN_ORDE
 
 RUNNER = CliRunner()
 SCENARIO_CONFIG_CASES = [
-    "formalin",
-    "capsaicin",
-    "compound_48_80",
-    "carrageenan",
-    "hot_plate",
-    "acetic_writhing",
-    "zymosan",
+    ("formalin", "formalin.yaml"),
+    ("intact", "_intact.yaml"),
+    ("capsaicin", "capsaicin.yaml"),
+    ("compound_48_80", "compound_48_80.yaml"),
+    ("carrageenan", "carrageenan.yaml"),
+    ("hot_plate", "hot_plate.yaml"),
+    ("acetic_writhing", "acetic_writhing.yaml"),
+    ("zymosan", "zymosan.yaml"),
 ]
 
 
@@ -49,9 +50,11 @@ def test_cli_simulate_writes_csv_and_meta_yaml(tmp_path: Path) -> None:
     assert len(meta["runtime_assumptions"]) >= 1
 
 
-@pytest.mark.parametrize("scenario_id", SCENARIO_CONFIG_CASES)
-def test_cli_simulate_runs_all_scenario_example_configs(tmp_path: Path, scenario_id: str) -> None:
-    cfg = Path(__file__).resolve().parents[1] / "examples" / "configs" / "scenarios" / f"{scenario_id}.yaml"
+@pytest.mark.parametrize(("scenario_id", "config_filename"), SCENARIO_CONFIG_CASES)
+def test_cli_simulate_runs_all_scenario_example_configs(
+    tmp_path: Path, scenario_id: str, config_filename: str
+) -> None:
+    cfg = Path(__file__).resolve().parents[1] / "examples" / "configs" / "scenarios" / config_filename
     out = tmp_path / scenario_id
 
     result = RUNNER.invoke(app, ["simulate", "--config", str(cfg), "--out", str(out)])

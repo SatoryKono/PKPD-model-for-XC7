@@ -150,7 +150,8 @@ FIGURE_CAPTION_OVERRIDES = {
 }
 EMU_PER_INCH = 914400
 EMU_PER_PIXEL_AT_96_DPI = 9525
-MAX_IMAGE_WIDTH_EMU = int(9.0 * EMU_PER_INCH)
+MAX_IMAGE_WIDTH_EMU_LANDSCAPE = int(9.0 * EMU_PER_INCH)
+MAX_IMAGE_WIDTH_EMU_PORTRAIT = int(6.5 * EMU_PER_INCH)
 TABLE_KEY_COLUMN_DXA = 4200
 TABLE_VALUE_COLUMN_DXA = 9600
 
@@ -402,13 +403,13 @@ def _image_paragraph_xml(
 """.strip()
 
 
-def _image_size_emu(path: Path) -> tuple[int, int]:
+def _image_size_emu(path: Path, *, max_width_emu: int = MAX_IMAGE_WIDTH_EMU_LANDSCAPE) -> tuple[int, int]:
     width_px, height_px = _read_png_size(path)
     width_emu = width_px * EMU_PER_PIXEL_AT_96_DPI
     height_emu = height_px * EMU_PER_PIXEL_AT_96_DPI
-    if width_emu > MAX_IMAGE_WIDTH_EMU:
-        scale = MAX_IMAGE_WIDTH_EMU / float(width_emu)
-        width_emu = MAX_IMAGE_WIDTH_EMU
+    if width_emu > max_width_emu:
+        scale = max_width_emu / float(width_emu)
+        width_emu = max_width_emu
         height_emu = int(height_emu * scale)
     return width_emu, height_emu
 

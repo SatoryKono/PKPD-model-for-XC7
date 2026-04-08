@@ -8,7 +8,7 @@ from matplotlib.axes import Axes
 
 TimeLike = TypeVar("TimeLike", float, np.ndarray, pd.Series)
 TIME_AXIS_STEP_MIN = 15.0
-TIME_AXIS_LABELED_MINUTES = (30.0, 60.0, 120.0, 240.0, 360.0, 480.0, 720.0, 1440.0)
+TIME_AXIS_LABELED_MINUTES = (30.0, 60.0, 120.0, 240.0)
 
 
 def time_minutes_from_hours(time_h: TimeLike) -> TimeLike:

@@ -11,6 +11,7 @@ from pkpd_xc7.config.schemas import ModelConfig, ScenarioDriver
 
 SCENARIO_CONFIG_CASES = [
     ("formalin", "rat", ["skin", "spinal_coord", "ganglia", "brain"]),
+    ("intact", "rat", ["skin", "spinal_coord", "ganglia", "brain"]),
     ("capsaicin", "rat", ["skin", "spinal_coord", "ganglia", "brain"]),
     ("compound_48_80", "mouse", ["skin", "spinal_coord", "ganglia", "brain"]),
     ("carrageenan", "rat", ["muscle", "spinal_coord", "ganglia", "brain"]),
@@ -18,6 +19,8 @@ SCENARIO_CONFIG_CASES = [
     ("acetic_writhing", "mouse", ["peritoneum", "spinal_coord", "ganglia", "brain"]),
     ("zymosan", "mouse", ["peritoneum", "spinal_coord", "ganglia", "brain"]),
 ]
+
+SCENARIO_EXAMPLE_FILENAME: dict[str, str] = {"intact": "_intact.yaml"}
 
 
 @pytest.fixture
@@ -234,7 +237,8 @@ def test_scenario_example_configs_validate(
     expected_species: str,
     expected_tissues: list[str],
 ) -> None:
-    path = scenario_examples_dir / f"{scenario_id}.yaml"
+    filename = SCENARIO_EXAMPLE_FILENAME.get(scenario_id, f"{scenario_id}.yaml")
+    path = scenario_examples_dir / filename
     cfg = load_model_config(path)
 
     assert isinstance(cfg.driver, ScenarioDriver)

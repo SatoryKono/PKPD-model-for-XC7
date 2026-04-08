@@ -1,3 +1,7 @@
+param(
+    [switch]$DryRun
+)
+
 $ErrorActionPreference = "Stop"
 
 function Invoke-Step {
@@ -5,30 +9,109 @@ function Invoke-Step {
         [Parameter(Mandatory = $true)]
         [string]$Label,
         [Parameter(Mandatory = $true)]
-        [string]$Command
+        [string]$Command,
+        [switch]$DryRun
     )
 
     Write-Host ""
     Write-Host "==> $Label" -ForegroundColor Cyan
     Write-Host $Command -ForegroundColor DarkGray
-    Invoke-Expression $Command
+    if (-not $DryRun) {
+        Invoke-Expression $Command
+    }
 }
 
-Invoke-Step -Label "Simulate formalin" -Command 'python -m pkpd_xc7.cli.app simulate --config "examples/configs/scenarios/formalin.yaml" --out "runs/formalin_pkpd_v1"'
-Invoke-Step -Label "Simulate capsaicin" -Command 'python -m pkpd_xc7.cli.app simulate --config "examples/configs/scenarios/capsaicin.yaml" --out "runs/capsaicin_pkpd_v1"'
-Invoke-Step -Label "Simulate compound_48_80" -Command 'python -m pkpd_xc7.cli.app simulate --config "examples/configs/scenarios/compound_48_80.yaml" --out "runs/compound_48_80_pkpd_v1"'
-Invoke-Step -Label "Simulate carrageenan" -Command 'python -m pkpd_xc7.cli.app simulate --config "examples/configs/scenarios/carrageenan.yaml" --out "runs/carrageenan_pkpd_v1"'
-Invoke-Step -Label "Simulate hot_plate" -Command 'python -m pkpd_xc7.cli.app simulate --config "examples/configs/scenarios/hot_plate.yaml" --out "runs/hot_plate_pkpd_v1"'
-Invoke-Step -Label "Simulate acetic_writhing" -Command 'python -m pkpd_xc7.cli.app simulate --config "examples/configs/scenarios/acetic_writhing.yaml" --out "runs/acetic_writhing_pkpd_v1"'
-Invoke-Step -Label "Simulate zymosan" -Command 'python -m pkpd_xc7.cli.app simulate --config "examples/configs/scenarios/zymosan.yaml" --out "runs/zymosan_pkpd_v1"'
+$scenarioMatrix = @(
+    @{ Name = "intact"; Config = "examples/configs/scenarios/_intact.yaml"; PlotScript = "docs/plot_intact.py" },
+    @{ Name = "formalin"; Config = "examples/configs/scenarios/formalin.yaml"; PlotScript = "docs/plot_formalin.py" },
+    @{ Name = "capsaicin"; Config = "examples/configs/scenarios/capsaicin.yaml"; PlotScript = "docs/plot_capsaicin.py" },
+    @{ Name = "compound_48_80"; Config = "examples/configs/scenarios/compound_48_80.yaml"; PlotScript = "docs/plot_compound4880.py" },
+    @{ Name = "carrageenan"; Config = "examples/configs/scenarios/carrageenan.yaml"; PlotScript = "docs/plot_carrageenan.py" },
+    @{ Name = "hot_plate"; Config = "examples/configs/scenarios/hot_plate.yaml"; PlotScript = "docs/plot_hotplate.py" }
+#    @{ Name = "acetic_writhing"; Config = "examples/configs/scenarios/acetic_writhing.yaml"; PlotScript = "docs/plot_writhing.py" },
+#    @{ Name = "zymosan"; Config = "examples/configs/scenarios/zymosan.yaml"; PlotScript = "docs/plot_zymosan.py" }
+)
+$ratDoses = @(9, 18, 36, 54, 72, 90, 180)
+$mouseDoses = @(15, 30, 60, 120, 150, 300)
 
-Invoke-Step -Label "Plot formalin" -Command 'python docs/plot_formalin.py --run-dir "runs/formalin_pkpd_v1" --out-dir "docs/figures"'
-Invoke-Step -Label "Plot capsaicin" -Command 'python docs/plot_capsaicin.py --run-dir "runs/capsaicin_pkpd_v1" --out-dir "docs/figures"'
-Invoke-Step -Label "Plot compound_48_80" -Command 'python docs/plot_compound4880.py --run-dir "runs/compound_48_80_pkpd_v1" --out-dir "docs/figures"'
-Invoke-Step -Label "Plot carrageenan" -Command 'python docs/plot_carrageenan.py --run-dir "runs/carrageenan_pkpd_v1" --out-dir "docs/figures"'
-Invoke-Step -Label "Plot hot_plate" -Command 'python docs/plot_hotplate.py --run-dir "runs/hot_plate_pkpd_v1" --out-dir "docs/figures"'
-Invoke-Step -Label "Plot acetic_writhing" -Command 'python docs/plot_writhing.py --run-dir "runs/acetic_writhing_pkpd_v1" --out-dir "docs/figures"'
-Invoke-Step -Label "Plot zymosan" -Command 'python docs/plot_zymosan.py --run-dir "runs/zymosan_pkpd_v1" --out-dir "docs/figures"'
+$tmpDir = "examples/configs/scenarios"
+New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+$createdTempConfigs = @()
+$scenarioDoseTags = @{}
+
+foreach ($scenario in $scenarioMatrix) {
+    $scenarioName = $scenario.Name
+    $scenarioConfig = $scenario.Config
+    $configText = Get-Content -Path $scenarioConfig -Raw -Encoding UTF8
+    $speciesMatch = [regex]::Match($configText, '(?m)^\s*species\s*:\s*(rat|mouse)\s*$')
+    if (-not $speciesMatch.Success) {
+        throw "Cannot resolve species in scenario config: $scenarioConfig"
+    }
+    $species = $speciesMatch.Groups[1].Value
+    $speciesDoses = if ($species -eq "rat") { $ratDoses } else { $mouseDoses }
+    $allDoseTags = if ($scenarioName -eq "intact") {
+        @("0")
+    } else {
+        @("0") + ($speciesDoses | ForEach-Object { $_.ToString() })
+    }
+    $scenarioDoseTags[$scenarioName] = $allDoseTags
+
+    foreach ($doseTag in $allDoseTags) {
+        $isBaseline = $doseTag -eq "0"
+        $tmpConfig = Join-Path $tmpDir "_tmp_$scenarioName`__dose_$($doseTag)mgkg.yaml"
+        $overrideBlock = if ($isBaseline) {
+@"
+
+antagonist_pk:
+  enabled: false
+"@
+        } else {
+@"
+
+antagonist_pk:
+  enabled: true
+  dose_mg_per_kg: $doseTag
+"@
+        }
+
+        Set-Content -Path $tmpConfig -Value ($configText + $overrideBlock) -Encoding UTF8
+        $createdTempConfigs += $tmpConfig
+
+        $outDir = "runs/$($scenarioName)_pkpd_v1__dose_$($doseTag)mgkg"
+        $simulateCommand = "python -m pkpd_xc7.cli.app simulate --config `"$tmpConfig`" --out `"$outDir`""
+        Invoke-Step -Label "Simulate $scenarioName dose=$doseTag mg/kg" -Command $simulateCommand -DryRun:$DryRun
+    }
+}
+
+foreach ($scenario in $scenarioMatrix) {
+    $scenarioName = $scenario.Name
+    $plotScript = $scenario.PlotScript
+    foreach ($doseTag in $scenarioDoseTags[$scenarioName]) {
+        $runDir = "runs/$($scenarioName)_pkpd_v1__dose_$($doseTag)mgkg"
+        $fileStemSuffix = "dose_$($doseTag)mgkg"
+        $baselineArg = ""
+        $intactRefArg = ""
+        if ($doseTag -ne "0") {
+            $baselineRunDir = "runs/$($scenarioName)_pkpd_v1__dose_0mgkg"
+            $baselineArg = " --baseline-run-dir `"$baselineRunDir`""
+            if ($scenarioName -ne "intact") {
+                $intactRefArg = " --intact-reference-run-dir `"runs/intact_pkpd_v1__dose_0mgkg`""
+            }
+        }
+        $plotCommand = "python $plotScript --run-dir `"$runDir`" --out-dir `"docs/figures`" --file-stem-suffix `"$fileStemSuffix`"$baselineArg$intactRefArg"
+        Invoke-Step -Label "Plot $scenarioName dose=$doseTag mg/kg" -Command $plotCommand -DryRun:$DryRun
+    }
+}
+
+foreach ($tmpConfig in $createdTempConfigs) {
+    if (Test-Path -Path $tmpConfig) {
+        Remove-Item -Path $tmpConfig -Force
+    }
+}
 
 Write-Host ""
-Write-Host "All simulations and plots completed." -ForegroundColor Green
+if ($DryRun) {
+    Write-Host "Dry-run completed. No commands were executed." -ForegroundColor Yellow
+} else {
+    Write-Host "All simulations and baseline plots completed." -ForegroundColor Green
+}
