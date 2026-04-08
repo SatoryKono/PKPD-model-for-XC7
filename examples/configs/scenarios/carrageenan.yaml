@@ -22,6 +22,60 @@ driver:
   driver_type: scenario
   scenario_id: carrageenan
 
+trafficking:
+  k_int_max_per_h: 1.25
+  k_rec_per_h: 0.5
+  k_synth_per_h: 0.05
+  ec50_barr_nm: 500.0
+  kb_arr_nm: 600.0
+  hill_n: 1.0
+  ec50_g_nm: 20.0
+  kb_g_nm: 6000.0
+  constitutive_activity: 0.05
+  h_base_nm: 10.0
+
+tissue_overrides:
+  muscle:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 385.0
+        center_min: 90.0
+        sigma_min: 50.0
+      phase2:
+        amplitude_nm: 150.0
+        center_min: 360.0
+        sigma_min: 150.0
+    trafficking:
+      h_base_nm: 10.0
+  spinal_coord:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 4.3
+        center_min: 180.0
+        sigma_min: 120.0
+    trafficking:
+      h_base_nm: 5.0
+  ganglia:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 3.0
+        center_min: 60.0
+        sigma_min: 40.0
+    trafficking:
+      h_base_nm: 10.0
+  brain:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 4.3
+        center_min: 180.0
+        sigma_min: 120.0
+    trafficking:
+      h_base_nm: 2.0
+
 tissues:
   - muscle
   - spinal_coord

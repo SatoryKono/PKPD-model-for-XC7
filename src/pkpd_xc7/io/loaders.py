@@ -10,6 +10,23 @@ import yaml
 from pkpd_xc7.io.layout import enforce_timeseries_layout
 
 
+def _suggest_sibling_run_dirs(target: Path) -> list[Path]:
+    """If ``target`` is not the leaf run directory, suggest siblings that have CSV+meta."""
+    parent = target.parent
+    prefix = target.name
+    if not parent.is_dir():
+        return []
+    out: list[Path] = []
+    for candidate in sorted(parent.iterdir()):
+        if not candidate.is_dir() or candidate.name == prefix:
+            continue
+        if not candidate.name.startswith(prefix):
+            continue
+        if (candidate / "simulation.csv").is_file() and (candidate / "meta.yaml").is_file():
+            out.append(candidate)
+    return out
+
+
 @dataclass(frozen=True, slots=True)
 class SimulationRun:
     run_dir: Path
@@ -43,8 +60,16 @@ def load_simulation_run(run_dir: Path | str, *, require_trafficking_params: bool
     missing = [path.name for path in (csv_path, meta_path) if not path.exists()]
     if missing:
         missing_str = ", ".join(missing)
+        hint = ""
+        if not resolved_run_dir.is_dir():
+            hint = " Run directory is missing or is not a directory."
+        suggestions = _suggest_sibling_run_dirs(resolved_run_dir)
+        if suggestions:
+            shown = ", ".join(str(p.as_posix()) for p in suggestions[:8])
+            suffix = " …" if len(suggestions) > 8 else ""
+            hint += f" Candidate run directories (have simulation.csv + meta.yaml): {shown}{suffix}"
         raise FileNotFoundError(
-            f"Missing required simulation artifacts in {resolved_run_dir}: {missing_str}"
+            f"Missing required simulation artifacts in {resolved_run_dir}: {missing_str}.{hint}"
         )
 
     timeseries = load_simulation_timeseries(csv_path)

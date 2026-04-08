@@ -395,3 +395,78 @@ def test_antagonist_pk_reduces_internalization_and_uses_t0_concentration(tmp_pat
     assert at_t0["R_surf"] == pytest.approx(expected_y0[0])
     assert at_t0["R_int"] == pytest.approx(expected_y0[1])
     assert at_t0["R_int"] < control_t0["R_int"]
+
+
+def test_antagonist_pk_administration_lag_keeps_t0_unexposed(tmp_path: Path) -> None:
+    source = tmp_path / "pk_source.xlsx"
+    pd.DataFrame(
+        [
+            {"species": "mice", "regimen": "single", "organ": "skin", "dose": 90.0, "time_h": 0.0, "C_nM": 120.0},
+            {"species": "mice", "regimen": "single", "organ": "skin", "dose": 90.0, "time_h": 1.0, "C_nM": 120.0},
+        ]
+    ).to_excel(source, index=False)
+    cfg = ModelConfig.model_validate(
+        _payload(
+            species="mouse",
+            time_grid_h=[0.0, 0.5, 1.0, 1.5],
+            trafficking={"h_base_nm": 50.0, "kb_arr_nm": 60.0},
+            antagonist_pk={
+                "enabled": True,
+                "source_xlsx": str(source),
+                "dose_mg_per_kg": 90.0,
+                "administration_lag_h": 0.5,
+                "regimen": "single",
+                "concentration_column": "C_nM",
+                "tissue_map": {"skin": "skin"},
+            },
+        )
+    )
+
+    result = run_experiment(cfg)
+    params = model_config_to_trafficking_core(cfg)
+    at_t0 = result.loc[np.isclose(result["time_h"].to_numpy(dtype=float), 0.0)].iloc[0]
+    at_t05 = result.loc[np.isclose(result["time_h"].to_numpy(dtype=float), 0.5)].iloc[0]
+    expected_y0 = steady_state_ic(float(at_t0["histamine_nm"]), params, xc7_nm=0.0)
+
+    assert at_t0[ANTAGONIST_CONCENTRATION_COL] == pytest.approx(0.0)
+    assert at_t05[ANTAGONIST_CONCENTRATION_COL] == pytest.approx(120.0)
+    assert at_t0["R_surf"] == pytest.approx(expected_y0[0])
+    assert at_t0["R_int"] == pytest.approx(expected_y0[1])
+
+
+def test_antagonist_pk_negative_administration_lag_exposes_t0_to_pretreatment(tmp_path: Path) -> None:
+    source = tmp_path / "pk_source.xlsx"
+    pd.DataFrame(
+        [
+            {"species": "mice", "regimen": "single", "organ": "skin", "dose": 90.0, "time_h": 0.0, "C_nM": 0.0},
+            {"species": "mice", "regimen": "single", "organ": "skin", "dose": 90.0, "time_h": 1.0, "C_nM": 120.0},
+            {"species": "mice", "regimen": "single", "organ": "skin", "dose": 90.0, "time_h": 2.0, "C_nM": 80.0},
+        ]
+    ).to_excel(source, index=False)
+    cfg = ModelConfig.model_validate(
+        _payload(
+            species="mouse",
+            time_grid_h=[0.0, 0.5, 1.0],
+            trafficking={"h_base_nm": 50.0, "kb_arr_nm": 60.0},
+            antagonist_pk={
+                "enabled": True,
+                "source_xlsx": str(source),
+                "dose_mg_per_kg": 90.0,
+                "administration_lag_h": -1.0,
+                "regimen": "single",
+                "concentration_column": "C_nM",
+                "tissue_map": {"skin": "skin"},
+            },
+        )
+    )
+
+    result = run_experiment(cfg)
+    params = model_config_to_trafficking_core(cfg)
+    at_t0 = result.loc[np.isclose(result["time_h"].to_numpy(dtype=float), 0.0)].iloc[0]
+    at_t1 = result.loc[np.isclose(result["time_h"].to_numpy(dtype=float), 1.0)].iloc[0]
+    expected_y0 = steady_state_ic(float(at_t0["histamine_nm"]), params, xc7_nm=120.0)
+
+    assert at_t0[ANTAGONIST_CONCENTRATION_COL] == pytest.approx(120.0)
+    assert at_t1[ANTAGONIST_CONCENTRATION_COL] == pytest.approx(80.0)
+    assert at_t0["R_surf"] == pytest.approx(expected_y0[0])
+    assert at_t0["R_int"] == pytest.approx(expected_y0[1])

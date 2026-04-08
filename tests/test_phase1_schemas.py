@@ -10,14 +10,15 @@ from pkpd_xc7.config.loader import load_model_config, load_model_config_payload
 from pkpd_xc7.config.schemas import ModelConfig, ScenarioDriver
 
 SCENARIO_CONFIG_CASES = [
-    ("formalin", "rat", ["skin", "spinal_coord", "ganglia", "brain"]),
+    ("formalin", "rat", ["skin", "ganglia", "spinal_coord", "brain"]),
     ("intact", "rat", ["skin", "spinal_coord", "ganglia", "brain"]),
-    ("capsaicin", "rat", ["skin", "spinal_coord", "ganglia", "brain"]),
-    ("compound_48_80", "mouse", ["skin", "spinal_coord", "ganglia", "brain"]),
+    ("capsaicin", "rat", ["skin", "ganglia", "spinal_coord", "brain"]),
+    ("compound_48_80", "mouse", ["skin", "ganglia", "spinal_coord", "brain"]),
     ("carrageenan", "rat", ["muscle", "spinal_coord", "ganglia", "brain"]),
     ("hot_plate", "mouse", ["skin", "spinal_coord", "ganglia", "brain"]),
     ("acetic_writhing", "mouse", ["peritoneum", "spinal_coord", "ganglia", "brain"]),
     ("zymosan", "mouse", ["peritoneum", "spinal_coord", "ganglia", "brain"]),
+    ("cyp_cystitis", "rat", ["bladder", "spinal_coord", "ganglia", "brain"]),
 ]
 
 SCENARIO_EXAMPLE_FILENAME: dict[str, str] = {"intact": "_intact.yaml"}
@@ -215,6 +216,41 @@ def test_antagonist_pk_normalizes_species_and_tissue_aliases() -> None:
     assert cfg.antagonist_pk.tissue_map["spinal_coord"] == "spinal cord"
 
 
+def test_antagonist_pk_administration_lag_defaults_to_zero() -> None:
+    cfg = ModelConfig.model_validate(
+        _scenario_payload(
+            species="mouse",
+            tissues=["skin"],
+            antagonist_pk={
+                "enabled": True,
+                "source_xlsx": "pk.xlsx",
+                "dose_mg_per_kg": 90.0,
+                "tissue_map": {"skin": "skin"},
+            },
+        )
+    )
+    assert cfg.antagonist_pk is not None
+    assert cfg.antagonist_pk.administration_lag_h == pytest.approx(0.0)
+
+
+def test_antagonist_pk_negative_administration_lag_is_accepted_for_pretreatment() -> None:
+    cfg = ModelConfig.model_validate(
+        _scenario_payload(
+            species="mouse",
+            tissues=["skin"],
+            antagonist_pk={
+                "enabled": True,
+                "source_xlsx": "pk.xlsx",
+                "dose_mg_per_kg": 90.0,
+                "administration_lag_h": -0.25,
+                "tissue_map": {"skin": "skin"},
+            },
+        )
+    )
+    assert cfg.antagonist_pk is not None
+    assert cfg.antagonist_pk.administration_lag_h == pytest.approx(-0.25)
+
+
 def test_tissue_overrides_hash_is_deterministic_for_identical_payloads() -> None:
     payload = _scenario_payload(
         tissues=["skin", "spinal_coord"],
@@ -258,18 +294,18 @@ def test_shared_config_payload_merges_before_validation(scenario_examples_dir: P
 
     assert payload["trafficking"]["k_int_max_per_h"] == pytest.approx(1.25)
     assert payload["trafficking"]["h_base_nm"] == pytest.approx(10.0)
-    assert "profile_shape" not in payload["formalin_profile"]
-    assert payload["tissue_overrides"]["skin"]["formalin_profile"]["profile_shape"] == "gaussian_sum"
-    assert payload["tissue_overrides"]["spinal_coord"]["trafficking"]["k_int_max_per_h"] == pytest.approx(1.4)
+    assert payload["formalin_profile"]["profile_shape"] == "pulse"
+    assert payload["tissue_overrides"]["skin"]["formalin_profile"]["profile_shape"] == "pulse"
+    assert payload["tissue_overrides"]["spinal_coord"]["trafficking"]["k_int_max_per_h"] == pytest.approx(0.7)
     assert payload["tissue_overrides"]["spinal_coord"]["formalin_profile"]["profile_shape"] == "gaussian_sum"
     assert payload["tissue_overrides"]["brain"]["formalin_profile"]["profile_shape"] == "gaussian_sum"
-    assert payload["tissue_overrides"]["brain"]["trafficking"]["k_int_max_per_h"] == pytest.approx(1.4)
-    assert payload["tissue_overrides"]["ganglia"]["trafficking"]["k_int_max_per_h"] == pytest.approx(1.8)
+    assert payload["tissue_overrides"]["brain"]["trafficking"]["k_int_max_per_h"] == pytest.approx(0.8)
+    assert payload["tissue_overrides"]["ganglia"]["trafficking"]["k_int_max_per_h"] == pytest.approx(1.25)
     assert payload["tissue_overrides"]["ganglia"]["formalin_profile"]["profile_shape"] == "gaussian_sum"
-    assert payload["tissue_overrides"]["spinal_coord"]["trafficking"]["h_base_nm"] == pytest.approx(2.0)
+    assert payload["tissue_overrides"]["spinal_coord"]["trafficking"]["h_base_nm"] == pytest.approx(5.0)
     assert cfg.tissue_overrides["ganglia"].trafficking is not None
     assert cfg.tissue_overrides["spinal_coord"].trafficking is not None
-    assert cfg.tissue_overrides["spinal_coord"].trafficking.k_int_max_per_h == pytest.approx(1.4)
-    assert cfg.tissue_overrides["ganglia"].trafficking.k_rec_per_h == pytest.approx(0.7)
-    assert cfg.tissue_overrides["ganglia"].trafficking.k_int_max_per_h == pytest.approx(1.8)
+    assert cfg.tissue_overrides["spinal_coord"].trafficking.k_int_max_per_h == pytest.approx(0.7)
+    assert cfg.tissue_overrides["ganglia"].trafficking.k_rec_per_h == pytest.approx(0.5)
+    assert cfg.tissue_overrides["ganglia"].trafficking.k_int_max_per_h == pytest.approx(1.25)
     assert cfg.tissue_overrides["ganglia"].trafficking.h_base_nm == pytest.approx(10.0)

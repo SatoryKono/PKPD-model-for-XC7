@@ -1,4 +1,4 @@
-# Матрица конфигурирования 7 сценарных моделей
+# Матрица конфигурирования сценарных моделей
 
 ## Назначение
 
@@ -23,18 +23,20 @@
 - `examples/configs/scenarios/hot_plate.yaml`
 - `examples/configs/scenarios/acetic_writhing.yaml`
 - `examples/configs/scenarios/zymosan.yaml`
+- `examples/configs/scenarios/cyp_cystitis.yaml`
 
 ## Сводная матрица по сценариям
 
 | Сценарий | Marker tissue из сводной таблицы | Runtime tissues в текущем коде | `encoded_in_yaml` | `taken_from_registry` | `recorded_as_assumption` | `requires_schema_change` |
 | --- | --- | --- | --- | --- | --- | --- |
 | Formalin | `skin` | `skin`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid`, общий `trafficking`, `formalin_profile` для `phase1.amplitude_nm`, `phase1.sigma_min`, `phase2.amplitude_nm` | формы `spinal_coord/ganglia/brain`, центры фаз formalin, допустимые tissues | перевод `t1/2` в `sigma_min`, единый блок trafficking для всех тканей, `brain` временно проксируется от `spinal_coord` | tissue-specific CA и trafficking, отдельные альтернативные литературные варианты |
-| Capsaicin | `skin` | `skin`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid`, общий `trafficking` | вся форма `H(t)` и базовые уровни тканей | что пики/времена skin принимаются из реестра как baseline; `brain` пока дублирует `spinal_coord` | tissue-specific CA и trafficking |
+| Capsaicin | `skin` | `skin`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid`, общий `trafficking`, `capsaicin_profile.phase1`, `tissue_overrides.<tissue>.capsaicin_profile.phase1` | registry fallback для `H(t)`, если capsaicin overrides не заданы; допустимые tissues | что `brain` пока дублирует `spinal_coord` по форме пика, пока не появится source-backed brain profile | tissue-specific CA |
 | Compound 48/80 | `skin` | `skin`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid`, общий `trafficking` | двухфазный skin-профиль и CNS-профили | что канонический `compound_48_80` используется напрямую, а `brain` временно проксируется от `spinal_coord` | tissue-specific CA и trafficking |
 | Carrageenan | `muscle` | `muscle`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid_h`, общий `trafficking` | ранняя и поздняя мышечные фазы, базовые уровни CNS | что поздняя фаза реестра трактуется как диапазон `4-8 h` baseline; `brain` пока дублирует `spinal_coord` | tissue-specific CA и trafficking |
 | Hot plate | `skin` | `skin`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid`, общий `trafficking` | весь gauss-профиль по тканям | что в качестве основного baseline выбран текстовый пик `262 nM`, а `brain` временно дублирует `spinal_coord` | хранение нескольких source variants в одном конфиге |
 | Acetic writhing | `peritoneum` | `peritoneum`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid`, общий `trafficking` | peritoneum/CNS-профили, допустимые tissues | что `peritoneum` используется как proxy для `перитонеальная стенка / лаваж`, а `brain` временно дублирует `spinal_coord` | vocab для wall/lavage, tissue-specific CA |
 | Zymosan | `peritoneum` proxy для `перитонеальный экссудат` | `peritoneum`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `time_grid_h`, marker-oriented `trafficking` (`k_int_max=0.28`, `k_rec=0.12`) | текущий delayed-like gaussian MVP профиль | что exudate аппроксимируется `peritoneum`, а `brain` временно дублирует `spinal_coord` | отдельная tissue vocabulary, `zymosan_like` runtime-ветка, tissue-specific CA |
+| CYP cystitis | `bladder` | `bladder`, `spinal_coord`, `ganglia`, `brain` | `scenario_id`, `cyp_cystitis_profile` (опц.), `tissue_overrides.<tissue>.formalin_profile` для фаз `gaussian_sum`, `time_grid_h`, `trafficking`, shared `antagonist_pk` | дефолтный H(t) по тканям в реестре, если фазы в YAML опущены; поддерживается только `gaussian_sum` | верхний `cyp_cystitis_profile.phase1/2` задаёт одинаковый merge 1-й/2-й гауссианы для **всех** тканей — органоспецифичные пики в `tissue_overrides`; горизонт MVP 24 ч; PK `bladder` → peritoneum в XLSX | обобщение поля до `scenario_profile` для всех сценариев (бэклог п.1) |
 
 ## Какие классы параметров реально кодируются сейчас
 
@@ -51,16 +53,18 @@
   `hill_n`, `constitutive_activity`
 - tissue-aware overrides через `tissue_overrides.<tissue>.trafficking`
 - список тканей, которые реально прогоняются в симуляции
-- только для `formalin`: `formalin_profile` и `tissue_overrides.<tissue>.formalin_profile`
+- только для `formalin` и `capsaicin`: scenario-specific profile overrides на top-level и в `tissue_overrides`
+- для `cyp_cystitis`: опциональный top-level `cyp_cystitis_profile` и `tissue_overrides.<tissue>.formalin_profile` (те же поля `phase1`/`phase2`, что у formalin `gaussian_sum`: `amplitude_nm`, `center_min`, `sigma_min`)
+- `antagonist_pk.administration_lag_h` для сценариев, где введение XC7 отстоит от индукции модели; отрицательные значения кодируют pretreatment
 
 ### `taken_from_registry`
 
 Эти параметры не дублируются в YAML, чтобы не расходиться с runtime-кодом:
 
-- `H_base` по тканям
-- форма `H(t)` для всех сценариев, кроме частичного override formalin
+- `H_base` по тканям для сценариев без explicit profile overrides
+- форма `H(t)` для сценариев без explicit YAML override
 - набор допустимых тканей для каждого `scenario_id`
-- центры и ширины фаз, если они не переопределены в `formalin_profile`
+- центры и ширины фаз, если они не переопределены в `formalin_profile` или `capsaicin_profile`
 - все CNS/ганглионарные профили
 
 Источник истины: `src/pkpd_xc7/simulation/scenario_registry.py`.
@@ -82,7 +86,7 @@
 
 Следующие классы параметров принципиально не выражаются текущим `ModelConfig`:
 
-- произвольные scenario-specific overrides для всех сценариев, а не только formalin
+- произвольные scenario-specific overrides для всех сценариев, а не только formalin/capsaicin
 - хранение альтернативных наборов source values в одном конфиге
 - source-backed литературный brain-профиль, отличный от временного proxy `spinal_coord -> brain`
 - канонические ключи тканей `peritoneal_wall`, `peritoneal_exudate`,
@@ -106,7 +110,7 @@
 
 Следующий change-set должен быть отдельным и явно versioned:
 
-1. Ввести `ScenarioOverrides` не только для `formalin`, но и для остальных сценариев.
+1. Ввести единый `ScenarioOverrides` / `scenario_profile` для всех сценариев (сейчас для `cyp_cystitis` частично закрыто отдельным полем `cyp_cystitis_profile` и переиспользованием `formalin_profile` в `tissue_overrides`).
 2. Разделить `trafficking` на общий baseline и tissue-aware overrides.
 3. Добавить канонический словарь tissue IDs и миграционные alias-правила.
 4. Реализовать `zymosan_like` в runtime или ввести табличный ввод `H(t)`.

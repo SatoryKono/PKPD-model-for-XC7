@@ -31,11 +31,13 @@ CANONICAL_SCENARIO_IDS: tuple[str, ...] = (
     "acetic_writhing",
     "zymosan",
     "compound_48_80",
+    "cyp_cystitis",
 )
 SHARED_TISSUE_OVERRIDE_IDS: tuple[str, ...] = (
     "skin",
     "muscle",
     "peritoneum",
+    "bladder",
     "spinal_coord",
     "brain",
     "ganglia",
@@ -110,6 +112,15 @@ class FormalinProfileOverrides(BaseModel):
     phase2: ScenarioPhaseOverrides | None = None
 
 
+class CapsaicinProfileOverrides(BaseModel):
+    profile_shape: ProfileShape = Field(
+        default="gaussian_sum",
+        description="Форма профиля H(t); для capsaicin в текущем runtime поддерживается gaussian_sum.",
+    )
+    h_base_nm: float | None = Field(default=None, ge=0)
+    phase1: ScenarioPhaseOverrides | None = None
+
+
 class TraffickingConfig(BaseModel):
     k_int_max_per_h: float = Field(default=3.0, gt=0)
     k_rec_per_h: float = Field(default=0.5, gt=0)
@@ -134,6 +145,15 @@ class TissueFormalinProfileOverrides(BaseModel):
     phase2: ScenarioPhaseOverrides | None = None
 
 
+class TissueCapsaicinProfileOverrides(BaseModel):
+    profile_shape: ProfileShape | None = Field(
+        default=None,
+        description="Тканеспецифичная форма профиля H(t); для capsaicin в текущем runtime поддерживается gaussian_sum.",
+    )
+    h_base_nm: float | None = Field(default=None, ge=0)
+    phase1: ScenarioPhaseOverrides | None = None
+
+
 class TraffickingOverrideConfig(BaseModel):
     k_int_max_per_h: float | None = Field(default=None, gt=0)
     k_rec_per_h: float | None = Field(default=None, gt=0)
@@ -151,6 +171,7 @@ class TraffickingOverrideConfig(BaseModel):
 class TissueOverrideConfig(BaseModel):
     trafficking: TraffickingOverrideConfig | None = None
     formalin_profile: TissueFormalinProfileOverrides | None = None
+    capsaicin_profile: TissueCapsaicinProfileOverrides | None = None
 
 
 PKRegimen = Literal["single", "repeated"]
@@ -177,6 +198,11 @@ class AntagonistPKConfig(BaseModel):
         description="Доза XC7, для которой строится тканевой профиль концентрации.",
     )
     concentration_column: str = Field(default="C_nM", min_length=1)
+    administration_lag_h: float = Field(
+        default=0.0,
+        allow_inf_nan=False,
+        description="Лаг между индукцией модели (time_h=0) и введением XC7, часы.",
+    )
     tissue_map: dict[str, str] = Field(
         default_factory=dict,
         description="Сопоставление канонической ткани модели -> organ из XLSX.",
@@ -222,7 +248,7 @@ DriverAnnotated = Annotated[
 
 
 class ModelConfig(BaseModel):
-    schema_version: str = Field(default="1.2.0", description="Версия схемы конфигурации")
+    schema_version: str = Field(default="1.3.0", description="Версия схемы конфигурации")
     model_id: str
     compound: str
     species: Literal["rat", "mouse"] | None = Field(
@@ -247,13 +273,29 @@ class ModelConfig(BaseModel):
         default=None,
         description="Опциональные overrides для scenario_id=formalin.",
     )
+    capsaicin_profile: CapsaicinProfileOverrides | None = Field(
+        default=None,
+        description="Опциональные overrides для scenario_id=capsaicin.",
+    )
     intact_profile: FormalinProfileOverrides | None = Field(
         default=None,
         description="Опциональные overrides для scenario_id=intact (та же схема, что formalin_profile).",
     )
+    cyp_cystitis_profile: FormalinProfileOverrides | None = Field(
+        default=None,
+        description=(
+            "Опциональные двухфазные overrides гистамина для scenario_id=cyp_cystitis "
+            "(gaussian_sum: phase1/phase2 с amplitude_nm, center_min, sigma_min в минутах). "
+            "Базовый H(t) задаётся в scenario_registry; отсутствие поля сохраняет реестр."
+        ),
+    )
     tissue_overrides: dict[str, TissueOverrideConfig] = Field(
         default_factory=dict,
-        description="Опциональные переопределения trafficking/formalin_profile по имени ткани.",
+        description=(
+            "Опциональные переопределения trafficking/formalin_profile/capsaicin_profile по имени ткани. "
+            "Для cyp_cystitis блок formalin_profile внутри tissue_overrides задаёт те же двухфазные "
+            "gaussian_sum-поля, что верхний cyp_cystitis_profile, поверх реестра по ткани."
+        ),
     )
 
     tissues: List[str] = Field(min_length=1)

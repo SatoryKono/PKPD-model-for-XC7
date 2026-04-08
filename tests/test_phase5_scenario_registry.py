@@ -62,7 +62,7 @@ def test_formalin_profile_override_updates_defaults() -> None:
     )
 
     spec = resolve_formalin_spec(config)
-    assert config.schema_version == "1.2.0"
+    assert config.schema_version == "1.3.0"
     assert spec.profile_shape == "gaussian_sum"
     assert math.isclose(spec.tissue_profiles["skin"].h_base_nm, 60.0, rel_tol=0.0, abs_tol=1e-12)
     assert math.isclose(

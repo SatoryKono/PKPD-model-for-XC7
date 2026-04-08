@@ -105,9 +105,10 @@ driver:
 
 Поле `driver.profile_shape` опционально. Итоговая форма разрешается по приоритету:
 
-1. `formalin_profile.profile_shape`
-2. `driver.profile_shape`
-3. default из scenario registry
+1. `formalin_profile.profile_shape` для `scenario_id=formalin`
+2. `capsaicin_profile.profile_shape` для `scenario_id=capsaicin`
+3. `driver.profile_shape`
+4. default из scenario registry
 
 ## 4. Канонизация `scenario_id`
 
@@ -123,12 +124,14 @@ Runtime нормализует несколько legacy-алиасов к ка�
 
 Важно для воспроизводимости артефактов: в `simulation.csv`/`meta.yaml` поле `driver_id` для scenario-ветки записывается уже в каноническом виде. Например, входной alias `compound48_80` будет экспортирован как `compound_48_80`.
 
-## 5. `formalin_profile` и единицы времени
+## 5. `formalin_profile`, `capsaicin_profile` и единицы времени
 
 Каноническое место для базального уровня гистамина `h_base_nm` теперь находится в `trafficking`
 или в `tissue_overrides.<tissue>.trafficking`. Блок `formalin_profile` остаётся точечным
-override только для формы и фаз `scenario_id: formalin`; legacy-чтение `formalin_profile.h_base_nm`
-сохраняется только для обратной совместимости.
+override для формы и фаз `scenario_id: formalin`; legacy-чтение `formalin_profile.h_base_nm`
+сохраняется только для обратной совместимости. Для `scenario_id: capsaicin` аналогичный
+контракт доступен через `capsaicin_profile`, но в текущем runtime он поддерживает только
+один гауссов пик (`phase1`) и только `profile_shape: gaussian_sum`.
 
 Поддерживаемые поля:
 
@@ -157,6 +160,30 @@ formalin_profile:
 - В runtime все вычисления `H(t)` выполняются только в часах (`t_h`).
 - Реестр сценариев хранит параметры только в часах и нМ.
 
+Пример для `capsaicin_profile`:
+
+```yaml
+capsaicin_profile:
+  profile_shape: gaussian_sum
+  phase1:
+    amplitude_nm: 177.0
+    center_min: 15.0
+    sigma_min: 12.0
+```
+
+Тканеспецифичный override использует тот же паттерн:
+
+```yaml
+tissue_overrides:
+  spinal_coord:
+    capsaicin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 2.3
+        center_min: 90.0
+        sigma_min: 60.0
+```
+
 ## 6. `trafficking` и конкурентный антагонизм XC7
 
 Блок `trafficking` остаётся источником правды для параметров H3R-траффикинга и pathway-specific фармакологии:
@@ -184,6 +211,22 @@ trafficking:
 - `kb_g_nm` задаёт конкурентный сдвиг XC7 для G-signaling pathway по той же равновесной схеме `histamine_eff_nm = histamine_nm / (1 + xc7_nm / kb_g_nm)`.
 - Это влияет на `agonist_g_signal_fraction`, `g_signaling_fraction`, а также на экспортируемые `G_signal` и `G_signal_ligand`.
 - Если `kb_arr_nm` или `kb_g_nm` не заданы явно, runtime детерминированно использует fallback к соответствующему `ec50_barr_nm` или `ec50_g_nm`.
+
+Для сценариев с внешним PK XC7 также поддерживается лаг между индукцией модели и моментом введения препарата:
+
+```yaml
+antagonist_pk:
+  enabled: true
+  dose_mg_per_kg: 90.0
+  administration_lag_h: 0.0
+```
+
+Важно:
+
+- `time_h=0` по-прежнему означает момент индукции модели.
+- `administration_lag_h` сдвигает только временную ось XC7 PK, а не сценарный `H(t)`.
+- `administration_lag_h > 0` означает введение XC7 после индукции; до момента `time_h < administration_lag_h` runtime использует `xc7_nm = 0`.
+- `administration_lag_h < 0` означает pretreatment: в момент `time_h=0` модель уже видит XC7 на интервале `abs(administration_lag_h)` часов после введения.
 
 ## 7. Трассируемость и допущения
 

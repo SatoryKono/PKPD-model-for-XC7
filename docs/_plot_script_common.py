@@ -28,7 +28,7 @@ def run_plot_script(spec: ScenarioPlotSpec, *, description: str) -> int:
         "--run-dir",
         type=Path,
         required=True,
-        help="Каталог с артефактами симуляции: simulation.csv и meta.yaml",
+        help="Каталог с артефактами симуляции (simulation.csv, meta.yaml), обычно runs/<сценарий>__dose_<N>mgkg",
     )
     parser.add_argument(
         "--out-dir",

@@ -304,6 +304,7 @@ class AntagonistPKRuntime:
     regimen: str
     dose_mg_per_kg: float
     concentration_column: str
+    administration_lag_h: float
     tissue_map: dict[str, str]
     method_time: TimeMethod
     method_dose: DoseMethod
@@ -311,10 +312,14 @@ class AntagonistPKRuntime:
     allow_single_dose_scaling: bool
 
     def concentration_nm(self, tissue: str, time_h: float) -> float:
+        model_time_h = float(time_h)
+        if self.administration_lag_h > 0.0 and model_time_h < self.administration_lag_h:
+            return 0.0
+        pk_time_h = model_time_h - self.administration_lag_h
         return self.model.predict(
             dose_mg_per_kg=self.dose_mg_per_kg,
             tissue=tissue,
-            time_h=time_h,
+            time_h=pk_time_h,
             method_time=self.method_time,
             method_dose=self.method_dose,
             extrapolation=self.extrapolation,
@@ -329,6 +334,7 @@ class AntagonistPKRuntime:
             "regimen": self.regimen,
             "dose_mg_per_kg": self.dose_mg_per_kg,
             "concentration_column": self.concentration_column,
+            "administration_lag_h": self.administration_lag_h,
             "tissue_map": dict(self.tissue_map),
             "method_time": self.method_time,
             "method_dose": self.method_dose,
@@ -340,7 +346,8 @@ class AntagonistPKRuntime:
         return (
             "XC7 concentration-time profiles are interpolated from the configured XLSX source using "
             f"time={self.method_time}, dose={self.method_dose}, extrapolation={self.extrapolation}, "
-            f"species={self.resolved_species}, regimen={self.regimen}, dose={self.dose_mg_per_kg:g} mg/kg."
+            f"species={self.resolved_species}, regimen={self.regimen}, dose={self.dose_mg_per_kg:g} mg/kg, "
+            f"administration_lag_h={self.administration_lag_h:g}."
         )
 
 
@@ -414,6 +421,7 @@ def build_antagonist_pk_runtime(config: ModelConfig) -> AntagonistPKRuntime | No
         regimen=pk_config.regimen,
         dose_mg_per_kg=float(pk_config.dose_mg_per_kg),
         concentration_column=concentration_column,
+        administration_lag_h=float(pk_config.administration_lag_h),
         tissue_map=resolved_tissue_map,
         method_time=pk_config.method_time,
         method_dose=pk_config.method_dose,

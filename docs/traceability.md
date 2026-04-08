@@ -25,6 +25,8 @@
 | `tissue_overrides.<tissue>.trafficking.*` | Tissue-specific override поверх общего baseline | `src/pkpd_xc7/config/schemas.py`; `src/pkpd_xc7/simulation/model_mapping.py` |
 | `formalin_profile.*` | Top-level override только для `scenario_id: formalin` | `src/pkpd_xc7/config/schemas.py`; `src/pkpd_xc7/simulation/scenario_registry.py` |
 | `tissue_overrides.<tissue>.formalin_profile.*` | Tissue-specific formalin override | `src/pkpd_xc7/config/schemas.py`; `src/pkpd_xc7/simulation/scenario_registry.py` |
+| `capsaicin_profile.*` | Top-level override только для `scenario_id: capsaicin` | `src/pkpd_xc7/config/schemas.py`; `src/pkpd_xc7/simulation/scenario_registry.py` |
+| `tissue_overrides.<tissue>.capsaicin_profile.*` | Tissue-specific capsaicin override | `src/pkpd_xc7/config/schemas.py`; `src/pkpd_xc7/simulation/scenario_registry.py` |
 | `tissues[]` | Явный список прогоняемых тканей | `src/pkpd_xc7/config/schemas.py`; `src/pkpd_xc7/simulation/runner.py` |
 | `time_grid_h` | Каноническая временная сетка в часах | `src/pkpd_xc7/config/schemas.py`; `src/pkpd_xc7/simulation/runner.py` |
 | `time_grid + time_unit` | Входная форма, нормализуемая в `time_grid_h` | `src/pkpd_xc7/config/schemas.py` |

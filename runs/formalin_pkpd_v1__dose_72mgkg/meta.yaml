@@ -1,5 +1,5 @@
-config_sha256: 82c83bfbd774fe5ae0978f4a7005c608bebf55d2a8e51af7c837372c845b7e38
-config_schema_version: 1.2.0
+config_sha256: a73b62784560846dde469f3212bb68ce5ac7b55e91bc75983ee00bd996d8215c
+config_schema_version: 1.3.0
 simulation_schema_version: 2.1.0
 column_order:
 - time_h
@@ -23,65 +23,65 @@ column_order:
 row_count: 200
 driver_type: scenario
 driver_id: formalin
-generated_at_utc: '2026-04-07T17:56:14Z'
+generated_at_utc: '2026-04-08T18:17:15Z'
 default_trafficking_params:
   k_int_max_per_h: 1.25
   k_rec_per_h: 0.5
   k_synth_per_h: 0.05
-  ec50_barr_nm: 500.0
+  ec50_barr_nm: 750.0
   ec50_internalization_nm: null
-  kb_arr_nm: 600.0
+  kb_arr_nm: 1000.0
   hill_n: 1.0
-  ec50_g_nm: 20.0
+  ec50_g_nm: 40.0
   kb_g_nm: 6000.0
   constitutive_activity: 0.05
   h_base_nm: 10.0
 trafficking_params_by_tissue:
   skin:
     k_int_max_per_h: 1.25
+    k_rec_per_h: 0.8
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 750.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.05
+    h_base_nm: 10.0
+  ganglia:
+    k_int_max_per_h: 1.25
     k_rec_per_h: 0.5
     k_synth_per_h: 0.05
     ec50_barr_nm: 500.0
     ec50_internalization_nm: null
-    kb_arr_nm: 600.0
+    kb_arr_nm: 1000.0
     hill_n: 1.0
-    ec50_g_nm: 20.0
-    kb_g_nm: 6000.0
-    constitutive_activity: 0.05
-    h_base_nm: 10.0
-  spinal_coord:
-    k_int_max_per_h: 1.4
-    k_rec_per_h: 0.8
-    k_synth_per_h: 0.05
-    ec50_barr_nm: 500.0
-    ec50_internalization_nm: null
-    kb_arr_nm: 600.0
-    hill_n: 1.0
-    ec50_g_nm: 20.0
-    kb_g_nm: 6000.0
-    constitutive_activity: 0.25
-    h_base_nm: 2.0
-  ganglia:
-    k_int_max_per_h: 1.8
-    k_rec_per_h: 0.7
-    k_synth_per_h: 0.05
-    ec50_barr_nm: 500.0
-    ec50_internalization_nm: null
-    kb_arr_nm: 600.0
-    hill_n: 1.0
-    ec50_g_nm: 20.0
+    ec50_g_nm: 40.0
     kb_g_nm: 6000.0
     constitutive_activity: 0.1
     h_base_nm: 10.0
-  brain:
-    k_int_max_per_h: 1.4
-    k_rec_per_h: 0.8
+  spinal_coord:
+    k_int_max_per_h: 0.7
+    k_rec_per_h: 0.7
     k_synth_per_h: 0.05
-    ec50_barr_nm: 500.0
+    ec50_barr_nm: 750.0
     ec50_internalization_nm: null
-    kb_arr_nm: 600.0
+    kb_arr_nm: 1000.0
     hill_n: 1.0
-    ec50_g_nm: 20.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.25
+    h_base_nm: 5.0
+  brain:
+    k_int_max_per_h: 0.8
+    k_rec_per_h: 0.25
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 750.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
     kb_g_nm: 6000.0
     constitutive_activity: 0.25
     h_base_nm: 2.0
@@ -96,7 +96,8 @@ runtime_assumptions:
   before tissue_overrides, including tissue-specific profile_shape, are applied
 - brain is included as a mandatory CNS tissue and currently uses a spinal_coord proxy
   profile until a source-backed brain profile is introduced
-- formalin skin phase-1 half-life of 9 min is approximated as gaussian sigma_min=7.6
+- formalin driver and top-level formalin_profile use pulse H(t); spinal_coord, ganglia,
+  and brain keep gaussian_sum via tissue_overrides
 - phase-2 skin peak is encoded via formalin_profile amplitude override to reach 400
   nM on a 50 nM baseline
 - spinal_coord and ganglia phase centers are fixed at 30/120 min and 15/60 min respectively
@@ -104,7 +105,7 @@ runtime_assumptions:
 - k_deg implicitly equals k_synth per ODE mass-balance invariant
 - XC7 concentration-time profiles are interpolated from the configured XLSX source
   using time=linear, dose=log-linear, extrapolation=clip, species=rat, regimen=single,
-  dose=72 mg/kg.
+  dose=72 mg/kg, administration_lag_h=0.
 antagonist_pk:
   enabled: true
   source_xlsx: examples\configs\shared\SINGLE_REP_pred_mice_rats.xlsx
@@ -113,6 +114,7 @@ antagonist_pk:
   regimen: single
   dose_mg_per_kg: 72.0
   concentration_column: C_nM
+  administration_lag_h: 0.0
   tissue_map:
     skin: skin
     muscle: muscles
@@ -120,6 +122,7 @@ antagonist_pk:
     brain: brain
     ganglia: sympathetic ganglia
     peritoneum: peritoneum
+    bladder: peritoneum
   method_time: linear
   method_dose: log-linear
   extrapolation: clip

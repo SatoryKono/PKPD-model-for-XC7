@@ -35,6 +35,7 @@ TISSUE_LABELS: dict[str, str] = {
     "brain": "Головной мозг",
     "muscle": "Мышца",
     "peritoneum": "Брюшина",
+    "bladder": "Мочевой пузырь",
 }
 TISSUE_COLORS: dict[str, str] = {
     "skin": "#d62728",
@@ -45,6 +46,7 @@ TISSUE_COLORS: dict[str, str] = {
     "brain": "#9467bd",
     "muscle": "#8c564b",
     "peritoneum": "#ff7f0e",
+    "bladder": "#17becf",
 }
 EC50_COLOR = "#888888"
 CA_COLOR = "#aaaaaa"

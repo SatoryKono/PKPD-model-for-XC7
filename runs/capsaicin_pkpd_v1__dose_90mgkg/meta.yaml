@@ -1,5 +1,5 @@
-config_sha256: fb77222fa4c54e85d664cfccf95911b9bf3afa9a21cbd35d58cdf7e422647666
-config_schema_version: 1.2.0
+config_sha256: 35e7072009e005773e355cbad4b8a59bc9ed98d94f59e7cf84856c1bbfc8b213
+config_schema_version: 1.3.0
 simulation_schema_version: 2.1.0
 column_order:
 - time_h
@@ -23,65 +23,65 @@ column_order:
 row_count: 200
 driver_type: scenario
 driver_id: capsaicin
-generated_at_utc: '2026-04-07T17:56:31Z'
+generated_at_utc: '2026-04-08T18:17:34Z'
 default_trafficking_params:
   k_int_max_per_h: 1.25
   k_rec_per_h: 0.5
   k_synth_per_h: 0.05
-  ec50_barr_nm: 500.0
+  ec50_barr_nm: 750.0
   ec50_internalization_nm: null
-  kb_arr_nm: 600.0
+  kb_arr_nm: 1000.0
   hill_n: 1.0
-  ec50_g_nm: 20.0
+  ec50_g_nm: 40.0
   kb_g_nm: 6000.0
   constitutive_activity: 0.05
   h_base_nm: 10.0
 trafficking_params_by_tissue:
   skin:
     k_int_max_per_h: 1.25
+    k_rec_per_h: 0.8
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 750.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.05
+    h_base_nm: 10.0
+  ganglia:
+    k_int_max_per_h: 1.25
     k_rec_per_h: 0.5
     k_synth_per_h: 0.05
     ec50_barr_nm: 500.0
     ec50_internalization_nm: null
-    kb_arr_nm: 600.0
+    kb_arr_nm: 1000.0
     hill_n: 1.0
-    ec50_g_nm: 20.0
-    kb_g_nm: 6000.0
-    constitutive_activity: 0.05
-    h_base_nm: 50.0
-  spinal_coord:
-    k_int_max_per_h: 1.4
-    k_rec_per_h: 0.8
-    k_synth_per_h: 0.05
-    ec50_barr_nm: 500.0
-    ec50_internalization_nm: null
-    kb_arr_nm: 600.0
-    hill_n: 1.0
-    ec50_g_nm: 20.0
-    kb_g_nm: 6000.0
-    constitutive_activity: 0.25
-    h_base_nm: 2.0
-  ganglia:
-    k_int_max_per_h: 1.8
-    k_rec_per_h: 0.7
-    k_synth_per_h: 0.05
-    ec50_barr_nm: 500.0
-    ec50_internalization_nm: null
-    kb_arr_nm: 600.0
-    hill_n: 1.0
-    ec50_g_nm: 20.0
+    ec50_g_nm: 40.0
     kb_g_nm: 6000.0
     constitutive_activity: 0.1
     h_base_nm: 10.0
-  brain:
-    k_int_max_per_h: 1.4
-    k_rec_per_h: 0.8
+  spinal_coord:
+    k_int_max_per_h: 0.7
+    k_rec_per_h: 0.7
     k_synth_per_h: 0.05
-    ec50_barr_nm: 500.0
+    ec50_barr_nm: 750.0
     ec50_internalization_nm: null
-    kb_arr_nm: 600.0
+    kb_arr_nm: 1000.0
     hill_n: 1.0
-    ec50_g_nm: 20.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.25
+    h_base_nm: 5.0
+  brain:
+    k_int_max_per_h: 0.8
+    k_rec_per_h: 0.25
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 750.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
     kb_g_nm: 6000.0
     constitutive_activity: 0.25
     h_base_nm: 2.0
@@ -92,18 +92,18 @@ solver_metadata:
   max_step: null
 runtime_assumptions:
 - canonical scenario_id capsaicin is used directly
-- skin, spinal_coord, and ganglia H(t) profiles are taken from scenario_registry as
-  the source of truth
+- shared/common trafficking and top-level capsaicin_profile act as deterministic defaults
+  before tissue_overrides are applied
 - brain is included as a mandatory CNS tissue and currently uses a spinal_coord proxy
-  profile until a source-backed brain profile is introduced
-- top-level trafficking acts as deterministic defaults before tissue_overrides are
-  applied
-- skin h_base_nm is overridden to 50 nM so the marker-tissue H(t) peak matches the
-  tabulated 227 nM at 15 min
+  histamine profile until a source-backed brain profile is introduced
+- capsaicin pulse H(t) peak parameters are stated explicitly in YAML and aligned with
+  the current scenario_registry defaults
+- skin h_base_nm is fixed explicitly at 10 nM; with the configured pulse amplitude
+  of 900 nM this yields a marker-tissue peak of about 910 nM around stimulus onset
 - k_deg implicitly equals k_synth per ODE mass-balance invariant
 - XC7 concentration-time profiles are interpolated from the configured XLSX source
   using time=linear, dose=log-linear, extrapolation=clip, species=rat, regimen=single,
-  dose=90 mg/kg.
+  dose=90 mg/kg, administration_lag_h=0.
 antagonist_pk:
   enabled: true
   source_xlsx: examples\configs\shared\SINGLE_REP_pred_mice_rats.xlsx
@@ -112,6 +112,7 @@ antagonist_pk:
   regimen: single
   dose_mg_per_kg: 90.0
   concentration_column: C_nM
+  administration_lag_h: 0.0
   tissue_map:
     skin: skin
     muscle: muscles
@@ -119,6 +120,7 @@ antagonist_pk:
     brain: brain
     ganglia: sympathetic ganglia
     peritoneum: peritoneum
+    bladder: peritoneum
   method_time: linear
   method_dose: log-linear
   extrapolation: clip

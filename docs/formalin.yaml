@@ -1,0 +1,139 @@
+# Уникальный идентификатор конфигурации/запуска.
+model_id: formalin_pkpd_v1
+# Исследуемое соединение.
+compound: xc7
+species: rat
+# Режим функции потерь для сопутствующих fit/report путей.
+loss_mode: mse
+
+# Блок трассируемости источника параметров.
+traceability:
+  # Откуда в отчёте взят этот сценарий.
+  source_in_report: "Scenario matrix row: formalin"
+  # Внешняя ссылка или DOI, если есть.
+  source_reference: ""
+  # Версия источника/сводной таблицы.
+  source_version: "2026-04-06"
+
+# Явно зафиксированные модельные допущения.
+assumptions:
+  - "canonical scenario_id formalin is used directly"
+  - "shared/common trafficking and top-level formalin_profile act as deterministic defaults before tissue_overrides, including tissue-specific profile_shape, are applied"
+  - "brain is included as a mandatory CNS tissue and currently uses a spinal_coord proxy profile until a source-backed brain profile is introduced"
+  - "formalin driver and top-level formalin_profile use pulse H(t); spinal_coord, ganglia, and brain keep gaussian_sum via tissue_overrides"
+  - "phase-2 skin peak is encoded via formalin_profile amplitude override to reach 400 nM on a 50 nM baseline"
+  - "spinal_coord and ganglia phase centers are fixed at 30/120 min and 15/60 min respectively because the source table specifies peaks and t1/2 but not phase timing"
+
+shared_configs:
+  - ../shared/common.yaml
+
+# Какой драйвер гистамина используется в симуляции.
+driver:
+  # Тип драйвера: сценарный профиль из реестра.
+  driver_type: scenario
+  # Канонический идентификатор сценария.
+  scenario_id: formalin
+  # Явно фиксируем форму профиля.
+  profile_shape: pulse
+
+# Базовый histamine-профиль formalin, используемый до тканевых override.
+formalin_profile:
+  # Форма профиля H(t) для formalin.
+  profile_shape: pulse
+  # Параметры ранней фазы.
+  phase1:
+    # Амплитуда фазы над базальным уровнем, нМ.
+    amplitude_nm: 990.0
+    center_min: 10.0    
+    tau_rise_min: 5.0
+    tau_fall_min: 15.0
+  # Параметры поздней фазы.
+  phase2:
+    # Амплитуда фазы над базальным уровнем, нМ.
+    amplitude_nm: 390.0
+    center_min: 60.0
+    tau_rise_min: 15.0
+    tau_fall_min: 90.0
+
+# Переопределения параметров для конкретных тканей.
+tissue_overrides:
+  skin:
+    # Тканеспецифичный histamine-профиль для кожи.
+    formalin_profile:
+      # Форма профиля H(t) для кожи.
+      profile_shape: pulse
+      phase1:
+        amplitude_nm: 900.0
+        center_min: 0.0
+        tau_rise_min: 2.0
+        tau_fall_min: 8.0 
+      phase2:
+        amplitude_nm: 390.0
+        # Амплитуда поздней фазы над базой, нМ.
+        center_min: 15.0
+        tau_rise_min: 15.0
+        tau_fall_min: 120.0
+  spinal_coord:
+    # Тканеспецифичный histamine-профиль для спинного мозга.
+    formalin_profile:
+      # Форма профиля H(t) для спинного мозга.
+      profile_shape: gaussian_sum
+      phase1:
+        # Амплитуда ранней фазы над базой, нМ.
+        amplitude_nm: 5
+        # Время центра ранней фазы, минут.
+        center_min: 120.0
+        # Ширина ранней фазы, минут.
+        sigma_min: 60
+      phase2:
+        # Амплитуда поздней фазы над базой, нМ.
+        amplitude_nm: 0.0
+        center_min: 15.0
+        tau_rise_min: 15.0
+        tau_fall_min: 45.0
+  ganglia:
+    # Тканеспецифичный histamine-профиль для симпатических ганглиев.
+    formalin_profile:
+      # Форма профиля H(t) для симпатических ганглиев.
+      profile_shape: gaussian_sum
+      phase1:
+        # Амплитуда пика над базальным уровнем, нМ.
+        amplitude_nm: 5
+        # Время центра пика, минут.
+        center_min: 40.0
+        # Ширина гауссианы, минут.
+        sigma_min: 90.0
+      phase2:
+        # Амплитуда поздней фазы над базой, нМ.
+        amplitude_nm: 0
+        # Время центра поздней фазы, минут.
+        center_min: 180.0
+        # Ширина поздней фазы, минут.
+        sigma_min: 60
+  brain:
+    # Тканеспецифичный histamine-профиль для головного мозга.
+    formalin_profile:
+      # Форма профиля H(t) для головного мозга.
+      profile_shape: gaussian_sum
+      phase1:
+        # Амплитуда ранней фазы над базой, нМ.
+        amplitude_nm: 0.25
+        # Время центра ранней фазы, минут.
+        center_min: 30.0
+        # Ширина ранней фазы, минут.
+        sigma_min: 80
+      phase2:
+        # Амплитуда поздней фазы над базой, нМ.
+        amplitude_nm: 7.883
+        # Время центра поздней фазы, минут.
+        center_min: 120.0
+        # Ширина поздней фазы, минут.
+        sigma_min: 73.9
+        
+# Список тканей, по которым будет рассчитана модель.
+tissues:
+  - skin
+  - spinal_coord
+  - ganglia
+  - brain
+  

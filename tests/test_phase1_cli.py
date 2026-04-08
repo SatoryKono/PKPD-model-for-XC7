@@ -20,6 +20,7 @@ SCENARIO_CONFIG_CASES = [
     ("hot_plate", "hot_plate.yaml"),
     ("acetic_writhing", "acetic_writhing.yaml"),
     ("zymosan", "zymosan.yaml"),
+    ("cyp_cystitis", "cyp_cystitis.yaml"),
 ]
 
 

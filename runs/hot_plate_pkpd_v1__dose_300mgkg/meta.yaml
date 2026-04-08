@@ -23,7 +23,7 @@ column_order:
 row_count: 200
 driver_type: scenario
 driver_id: hot_plate
-generated_at_utc: '2026-04-07T17:57:21Z'
+generated_at_utc: '2026-04-08T10:10:47Z'
 default_trafficking_params:
   k_int_max_per_h: 1.25
   k_rec_per_h: 0.5

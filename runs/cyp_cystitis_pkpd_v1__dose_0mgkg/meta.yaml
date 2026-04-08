@@ -1,0 +1,107 @@
+config_sha256: 645badde84016b9af5f19ab85c33af5bb515a3f2fa931a1d5effafba6b1fe51c
+config_schema_version: 1.3.0
+simulation_schema_version: 2.1.0
+column_order:
+- time_h
+- tissue
+- histamine_nm
+- R_surf
+- R_int
+- G_signal
+- G_signal_pct
+- G_signal_ligand
+- G_signal_ligand_pct
+- G_signal_constitutive
+- G_signal_constitutive_pct
+- beta_arr_signal
+- beta_arr_signal_pct
+- internalization_drive
+- k_int_eff_per_h
+- driver_type
+- driver_id
+- antagonist_concentration_nm
+row_count: 1156
+driver_type: scenario
+driver_id: cyp_cystitis
+generated_at_utc: '2026-04-08T18:17:53Z'
+default_trafficking_params:
+  k_int_max_per_h: 1.25
+  k_rec_per_h: 0.5
+  k_synth_per_h: 0.05
+  ec50_barr_nm: 750.0
+  ec50_internalization_nm: null
+  kb_arr_nm: 1000.0
+  hill_n: 1.0
+  ec50_g_nm: 40.0
+  kb_g_nm: 6000.0
+  constitutive_activity: 0.05
+  h_base_nm: 10.0
+trafficking_params_by_tissue:
+  bladder:
+    k_int_max_per_h: 1.25
+    k_rec_per_h: 0.5
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 750.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.05
+    h_base_nm: 10.0
+  spinal_coord:
+    k_int_max_per_h: 0.7
+    k_rec_per_h: 0.7
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 750.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.25
+    h_base_nm: 5.0
+  ganglia:
+    k_int_max_per_h: 1.25
+    k_rec_per_h: 0.5
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 500.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.1
+    h_base_nm: 10.0
+  brain:
+    k_int_max_per_h: 0.8
+    k_rec_per_h: 0.25
+    k_synth_per_h: 0.05
+    ec50_barr_nm: 750.0
+    ec50_internalization_nm: null
+    kb_arr_nm: 1000.0
+    hill_n: 1.0
+    ec50_g_nm: 40.0
+    kb_g_nm: 6000.0
+    constitutive_activity: 0.25
+    h_base_nm: 2.0
+solver_metadata:
+  solver_method: LSODA
+  rtol: 0.001
+  atol: 1.0e-06
+  max_step: null
+runtime_assumptions:
+- canonical scenario_id cyp_cystitis; baseline H(t) gaussian_sum per tissue is in
+  scenario_registry when YAML omits phase overrides
+- optional cyp_cystitis_profile and tissue_overrides.<tissue>.formalin_profile override
+  phase1/phase2 (amplitude_nm, center_min, sigma_min); top-level profile applies the
+  same phase merge to every tissue, so organ-specific peaks belong in tissue_overrides
+- simulation horizon 0-24 h with 5 min spacing; late-phase histamine gaussians are
+  encoded for longer horizons but contribute negligibly within 24 h
+- brain H(t) uses a dedicated registry profile (not spinal_coord proxy)
+- XC7 PK for bladder uses organ column peritoneum from SINGLE_REP_pred_mice_rats.xlsx
+  via antagonist_pk.tissue_map
+- bladder receptor-traffic parameters use peritoneum-like visceral proxy from the
+  scenario parameter table
+- top-level trafficking is merged with shared/common.yaml then overridden per tissue
+- k_deg implicitly equals k_synth per ODE mass-balance invariant

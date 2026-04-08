@@ -40,7 +40,7 @@ def _write_pk_source(tmp_path: Path) -> Path:
     return source
 
 
-def _config(source: Path) -> ModelConfig:
+def _config(source: Path, *, administration_lag_h: float = 0.0) -> ModelConfig:
     return ModelConfig.model_validate(
         {
             "model_id": "antagonist_pk_test",
@@ -55,6 +55,7 @@ def _config(source: Path) -> ModelConfig:
                 "enabled": True,
                 "source_xlsx": str(source),
                 "dose_mg_per_kg": 90.0,
+                "administration_lag_h": administration_lag_h,
                 "regimen": "single",
                 "concentration_column": "C_nM",
                 "tissue_map": {
@@ -78,6 +79,28 @@ def test_build_antagonist_pk_runtime_predicts_exact_nodes_and_zero_at_time_zero(
     assert runtime.metadata()["species"] == "mouse"
 
 
+def test_build_antagonist_pk_runtime_applies_administration_lag_before_lookup(tmp_path: Path) -> None:
+    source = _write_pk_source(tmp_path)
+    runtime = build_antagonist_pk_runtime(_config(source, administration_lag_h=1.0))
+    assert runtime is not None
+
+    assert runtime.concentration_nm("skin", 0.0) == pytest.approx(0.0)
+    assert runtime.concentration_nm("skin", 1.0) == pytest.approx(0.0)
+    assert runtime.concentration_nm("skin", 2.0) == pytest.approx(900.0)
+    assert runtime.metadata()["administration_lag_h"] == pytest.approx(1.0)
+
+
+def test_build_antagonist_pk_runtime_supports_negative_administration_lag_for_pretreatment(tmp_path: Path) -> None:
+    source = _write_pk_source(tmp_path)
+    runtime = build_antagonist_pk_runtime(_config(source, administration_lag_h=-1.0))
+    assert runtime is not None
+
+    assert runtime.concentration_nm("skin", 0.0) == pytest.approx(900.0)
+    assert runtime.concentration_nm("brain", 0.0) == pytest.approx(450.0)
+    assert runtime.concentration_nm("skin", 1.0) == pytest.approx(720.0)
+    assert runtime.metadata()["administration_lag_h"] == pytest.approx(-1.0)
+
+
 def test_run_experiment_adds_antagonist_column_and_runtime_meta(tmp_path: Path) -> None:
     source = _write_pk_source(tmp_path)
     df = run_experiment(_config(source))
@@ -88,4 +111,5 @@ def test_run_experiment_adds_antagonist_column_and_runtime_meta(tmp_path: Path) 
     assert skin == pytest.approx([0.0, 900.0, 720.0])
     assert brain == pytest.approx([0.0, 450.0, 360.0])
     assert df.attrs["antagonist_pk"]["dose_mg_per_kg"] == pytest.approx(90.0)
+    assert df.attrs["antagonist_pk"]["administration_lag_h"] == pytest.approx(0.0)
     assert any("XC7 concentration-time profiles are interpolated" in item for item in df.attrs["runtime_assumptions"])

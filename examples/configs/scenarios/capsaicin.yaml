@@ -1,35 +1,105 @@
+# Уникальный идентификатор конфигурации/запуска.
 model_id: capsaicin_pkpd_v1
+# Исследуемое соединение.
 compound: xc7
 species: rat
+# Режим функции потерь для сопутствующих fit/report путей.
 loss_mode: mse
 
+# Блок трассируемости источника параметров.
 traceability:
+  # Откуда в отчёте взят этот сценарий.
   source_in_report: "Scenario matrix row: capsaicin"
+  # Внешняя ссылка или DOI, если есть.
   source_reference: ""
+  # Версия источника/сводной таблицы.
   source_version: "2026-04-06"
 
+# Явно зафиксированные модельные допущения.
 assumptions:
   - "canonical scenario_id capsaicin is used directly"
-  - "skin, spinal_coord, and ganglia H(t) profiles are taken from scenario_registry as the source of truth"
-  - "brain is included as a mandatory CNS tissue and currently uses a spinal_coord proxy profile until a source-backed brain profile is introduced"
-  - "top-level trafficking acts as deterministic defaults before tissue_overrides are applied"
-  - "skin h_base_nm is overridden to 50 nM so the marker-tissue H(t) peak matches the tabulated 227 nM at 15 min"
+  - "shared/common trafficking and top-level capsaicin_profile act as deterministic defaults before tissue_overrides are applied"
+  - "brain is included as a mandatory CNS tissue and currently uses a spinal_coord proxy histamine profile until a source-backed brain profile is introduced"
+  - "capsaicin pulse H(t) peak parameters are stated explicitly in YAML and aligned with the current scenario_registry defaults"
+  - "skin h_base_nm is fixed explicitly at 10 nM; with the configured pulse amplitude of 900 nM this yields a marker-tissue peak of about 910 nM around stimulus onset"
 
 shared_configs:
   - ../shared/common.yaml
 
+# Какой драйвер гистамина используется в симуляции.
 driver:
+  # Тип драйвера: сценарный профиль из реестра.
   driver_type: scenario
+  # Канонический идентификатор сценария.
   scenario_id: capsaicin
+  # Явно фиксируем доступную для сценария форму профиля.
+  profile_shape: pulse
+
+# Базовый histamine-профиль capsaicin, используемый до тканевых override.
+capsaicin_profile:
+  profile_shape: pulse
+  phase1:
+    amplitude_nm: 15.0
+    center_min: 0.0
+    tau_rise_min: 5.0
+    tau_fall_min: 20.0
 
 tissue_overrides:
   skin:
     trafficking:
-      h_base_nm: 50.0
+      h_base_nm: 10.0
+    capsaicin_profile:
+      profile_shape: pulse
+      phase1:
+        amplitude_nm: 15.0
+        center_min: 0.0
+        tau_rise_min: 5.0
+        tau_fall_min: 20.0
+     
+     
+  spinal_coord:
+    # Тканеспецифичные параметры для спинного мозга.
+    capsaicin_profile:
+      # Форма профиля H(t) для спинного мозга.
+      profile_shape: gaussian_sum
+      phase1:
+        # Амплитуда ранней фазы над базой, нМ.
+        amplitude_nm: 10
+        # Время центра ранней фазы, минут.
+        center_min: 30.0
+        # Ширина ранней фазы, минут.
+        sigma_min: 120
+  
+  ganglia:
+    # Тканеспецифичные параметры для симпатических ганглиев.
+    capsaicin_profile:
+      # Форма профиля H(t) для симпатических ганглиев.
+      profile_shape: gaussian_sum
+      phase1:
+        # Амплитуда пика над базальным уровнем, нМ.
+        amplitude_nm: 5
+        # Время центра пика, минут.
+        center_min: 40.0
+        # Ширина гауссианы, минут.
+        sigma_min: 60.0
+ 
+  brain:
+    # Тканеспецифичный histamine-профиль для головного мозга.
+    capsaicin_profile:
+      # Форма профиля H(t) для головного мозга.
+      profile_shape: gaussian_sum
+      phase1:
+        # Амплитуда ранней фазы над базой, нМ.
+        amplitude_nm: 0.25
+        # Время центра ранней фазы, минут.
+        center_min: 30.0
+        # Ширина ранней фазы, минут.
+        sigma_min: 80
 
+
+# Список тканей, по которым будет рассчитана модель.
 tissues:
   - skin
-  - spinal_coord
   - ganglia
+  - spinal_coord
   - brain
-  

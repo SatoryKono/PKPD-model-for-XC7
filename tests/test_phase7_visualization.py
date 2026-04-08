@@ -337,7 +337,7 @@ def test_plot_scenario_run_figures_adds_baseline_overlay_lines(
     receptor_axes = captured["fig1_2_formalin_internalization.png"]
     assert all(len(axis_lines) == 3 for axis_lines in receptor_axes)
     for axis_lines in receptor_axes:
-        baseline_lines = [line for line in axis_lines if line["label"] == "Контроль (0 mg/kg), R_surf"]
+        baseline_lines = [line for line in axis_lines if line["label"] == "Контроль (XC7DCH 0 mg/kg), R_surf"]
         assert len(baseline_lines) == 1
         assert baseline_lines[0]["linestyle"] == "-"
         assert baseline_lines[0]["color"] == "#808080"

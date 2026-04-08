@@ -22,10 +22,55 @@ driver:
   driver_type: scenario
   scenario_id: hot_plate
 
+trafficking:
+  k_int_max_per_h: 1.25
+  k_rec_per_h: 0.5
+  k_synth_per_h: 0.05
+  ec50_barr_nm: 500.0
+  kb_arr_nm: 600.0
+  hill_n: 1.0
+  ec50_g_nm: 20.0
+  kb_g_nm: 6000.0
+  constitutive_activity: 0.05
+  h_base_nm: 10.0
+
 tissue_overrides:
   skin:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 212.0
+        center_min: 1.0
+        sigma_min: 2.0
     trafficking:
       h_base_nm: 20.0
+  spinal_coord:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 3.0
+        center_min: 2.0
+        sigma_min: 3.0
+    trafficking:
+      h_base_nm: 5.0
+  ganglia:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 9.8
+        center_min: 2.0
+        sigma_min: 2.0
+    trafficking:
+      h_base_nm: 10.0
+  brain:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 3.0
+        center_min: 2.0
+        sigma_min: 3.0
+    trafficking:
+      h_base_nm: 2.0
 
 tissues:
   - skin

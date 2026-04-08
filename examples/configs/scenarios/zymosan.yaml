@@ -11,7 +11,7 @@ traceability:
 assumptions:
   - "canonical scenario_id zymosan is used directly"
   - "runtime tissue peritoneum is used as a proxy for peritoneal exudate marker measurements"
-  - "XC7 antagonist PK for peritoneum is proxied by bladder using the repeated-regimen rows because the single-regimen source omits bladder"
+  - "XC7 antagonist PK mapping is inherited from shared/common.yaml without local remapping overrides"
   - "zymosan uses the current gaussian_sum MVP approximation from scenario_registry until a dedicated delayed profile is implemented"
   - "brain is included as a mandatory CNS tissue and currently uses a spinal_coord proxy profile until a source-backed brain profile is introduced"
   - "peritoneum h_base_nm is overridden to 50 nM so the marker-tissue H(t) peak matches the primary tabulated 350 nM value"
@@ -24,19 +24,55 @@ driver:
   driver_type: scenario
   scenario_id: zymosan
 
-antagonist_pk:
-  regimen: single
-  tissue_map:
-    peritoneum: muscle
-
 trafficking:
   k_int_max_per_h: 0.28
   k_rec_per_h: 0.12
+  k_synth_per_h: 0.05
+  ec50_barr_nm: 500.0
+  kb_arr_nm: 600.0
+  hill_n: 1.0
+  ec50_g_nm: 20.0
+  kb_g_nm: 6000.0
+  constitutive_activity: 0.05
+  h_base_nm: 10.0
 
 tissue_overrides:
   peritoneum:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 300.0
+        center_min: 210.0
+        sigma_min: 150.0
     trafficking:
       h_base_nm: 50.0
+  spinal_coord:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 1.6
+        center_min: 120.0
+        sigma_min: 200.0
+    trafficking:
+      h_base_nm: 5.0
+  ganglia:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 1.0
+        center_min: 180.0
+        sigma_min: 120.0
+    trafficking:
+      h_base_nm: 10.0
+  brain:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 1.6
+        center_min: 120.0
+        sigma_min: 200.0
+    trafficking:
+      h_base_nm: 2.0
 
 tissues:
   - peritoneum

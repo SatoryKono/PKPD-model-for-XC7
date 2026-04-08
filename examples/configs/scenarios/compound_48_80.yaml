@@ -21,10 +21,57 @@ shared_configs:
 driver:
   driver_type: scenario
   scenario_id: compound_48_80
+antagonist_pk:
+  administration_lag_h: -1.0
+
+tissue_overrides:
+  skin:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 1500.0
+        center_min: 5.0
+        sigma_min: 30.0
+      phase2:
+        amplitude_nm: 200.0
+        center_min: 120.0
+        sigma_min: 180.0
+    trafficking:
+      h_base_nm: 10.0
+
+  spinal_coord:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 10.0
+        center_min: 60.0
+        sigma_min: 120.0
+    trafficking:
+      h_base_nm: 5.0
+
+  ganglia:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 5.0
+        center_min: 20.0
+        sigma_min: 15.0
+    trafficking:
+      h_base_nm: 10.0
+
+  brain:
+    formalin_profile:
+      profile_shape: gaussian_sum
+      phase1:
+        amplitude_nm: 0.4
+        center_min: 120.0
+        sigma_min: 80.0
+    trafficking:
+      h_base_nm: 2.0
 
 tissues:
   - skin
-  - spinal_coord
   - ganglia
+  - spinal_coord
   - brain
     
