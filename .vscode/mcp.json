@@ -1,0 +1,129 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/workspace/PKPD-model-for-XC7"
+      ]
+    },
+    "fetch": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ]
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@docker/mcp-server"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "prometheus": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@prometheus/mcp"
+      ]
+    },
+    "grafana": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@grafana/mcp-server"
+      ]
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@brave/search-mcp-server"
+      ]
+    },
+    "sonarqube": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "sonarqube-mcp-server"
+      ]
+    },
+    "neo4j-cypher": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@neo4j/mcp-cypher"
+      ]
+    },
+    "neo4j-memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@neo4j/mcp-memory"
+      ]
+    },
+    "chembl": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chembl-mcp"
+      ]
+    },
+    "pubchem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "pubchem-mcp"
+      ]
+    },
+    "pubmed": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "pubmed-mcp"
+      ]
+    },
+    "mermaid": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mermaid-js/mermaid-mcp-server"
+      ]
+    },
+    "ast-grep": {
+      "command": "bash",
+      "args": [
+        "/workspace/PKPD-model-for-XC7/scripts/ai/mcp/mcp_ast_grep_wrapper.sh"
+      ]
+    },
+    "mcp-code-interpreter": {
+      "command": "bash",
+      "args": [
+        "/workspace/PKPD-model-for-XC7/scripts/ai/mcp/mcp_code_interpreter_wrapper.sh"
+      ]
+    }
+  }
+}
